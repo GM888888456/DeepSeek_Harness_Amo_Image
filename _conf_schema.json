@@ -390,5 +390,47 @@
     "description": "语音音量（0.1-2.0）",
     "hint": "1.0 是正常音量。",
     "default": 1.0
+  },
+  "voice_provider": {
+    "type": "string",
+    "description": "语音后端（edge 免费 / breeze / openai）",
+    "hint": "用自己的音源就填 breeze 并填下面的地址与 Key；edge 只是免费的兜底，不用微软就把 voice_provider 留 breeze。",
+    "default": "breeze"
+  },
+  "voice_api_base": {
+    "type": "string",
+    "description": "语音后端地址（Breeze 才需要）",
+    "hint": "例如 https://api.breezeblue.xyz，留空用默认。",
+    "default": ""
+  },
+  "voice_api_key": {
+    "type": "string",
+    "description": "语音后端 Key（Breeze 才需要）",
+    "hint": "和生图的 Key 分开填；这里留空不影响生图。",
+    "default": ""
+  },
+  "voice_model_id": {
+    "type": "string",
+    "description": "语音模型 ID（部分后端需要）",
+    "hint": "留空用后端默认。",
+    "default": ""
+  },
+  "voice_default_voice": {
+    "type": "string",
+    "description": "默认音色 ID",
+    "hint": "Breeze/OpenAI 用；留空用后端默认音色。",
+    "default": ""
+  },
+  "voice_edge_voice": {
+    "type": "string",
+    "description": "Edge 音色（免费后端）",
+    "hint": "默认 zh-CN-XiaoxiaoNeural。",
+    "default": "zh-CN-XiaoxiaoNeural"
+  },
+  "voice_language_code": {
+    "type": "string",
+    "description": "音色语言筛选",
+    "hint": "拉音色列表时按语言过滤，留空不限。",
+    "default": ""
   }
 }

@@ -428,27 +428,29 @@ class SpeechSoundPlugin(Star):
     # ------------------------------------------------------------------
 
     def _provider(self):
-        name = self._str("provider", "breeze").strip().lower() or "breeze"
+        # 语音后端必须是**独立配置**：以前和生图共用 provider/api_base/api_key，
+        # 生图换成星桥之后，语音拿着星桥的 key 去调 Breeze，一直 401。
+        name = (self._str("voice_provider") or "edge").strip().lower() or "edge"
         stamp = "|".join(
             [
                 name,
-                self._str("api_base"),
-                self._str("api_key"),
-                self._str("model_id"),
-                self._str("default_voice"),
-                self._str("edge_voice"),
+                self._str("voice_api_base"),
+                self._str("voice_api_key"),
+                self._str("voice_model_id"),
+                self._str("voice_default_voice"),
+                self._str("voice_edge_voice"),
                 str(self._int("timeout", 30)),
             ]
         )
         if self._provider_cache and self._provider_cache[0] == stamp:
             return self._provider_cache[1]
         settings = {
-            "api_base": self._str("api_base"),
-            "api_key": self._str("api_key"),
+            "api_base": self._str("voice_api_base"),
+            "api_key": self._str("voice_api_key"),
             "timeout": self._int("timeout", 30),
-            "model_id": self._str("model_id"),
-            "default_voice": self._str("default_voice"),
-            "edge_voice": self._str("edge_voice", "zh-CN-XiaoxiaoNeural"),
+            "model_id": self._str("voice_model_id"),
+            "default_voice": self._str("voice_default_voice"),
+            "edge_voice": self._str("voice_edge_voice", "zh-CN-XiaoxiaoNeural"),
         }
         provider = build_provider(name, settings)
         self._provider_cache = (stamp, provider)
@@ -1066,11 +1068,17 @@ class SpeechSoundPlugin(Star):
                 pass
         return payload
 
-    @staticmethod
-    def _fail(message):
+    _last_fail = ""
+
+    def _fail(self, message):
         # 桥接层把 4xx 当异常吞掉，前端只能显示「没有响应」；改成 200 + message，
         # 面板才能显示真实原因（401 key 无效 / 404 地址错 / 没填 key 等）。
-        logger.warning("[amo_voice] 面板接口失败：%s" % message)
+        # 但同一条错误不要每次轮询都刷 warning：第一次 warning，之后 debug。
+        if str(message) == type(self)._last_fail:
+            logger.debug("[amo_voice] 面板接口失败（重复）：%s" % message)
+        else:
+            type(self)._last_fail = str(message)
+            logger.warning("[amo_voice] 面板接口失败：%s" % message)
         if json_response is not None:
             try:
                 return json_response({"code": 1, "message": message})
