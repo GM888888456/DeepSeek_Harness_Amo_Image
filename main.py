@@ -89,6 +89,7 @@ try:
         form_clause,
         scene_anchor,
         split_prompts,
+        place_words_scene,
     )
 except Exception:  # pragma: no cover - 直接以脚本方式加载时
     from consistency import (  # type: ignore
@@ -104,6 +105,7 @@ except Exception:  # pragma: no cover - 直接以脚本方式加载时
         form_clause,
         scene_anchor,
         split_prompts,
+        place_words_scene,
     )
 
 try:
@@ -1548,6 +1550,15 @@ class AmoImagePlugin(Star):
         place = explicit or self._scene_place()
         zone_key = str(zone or "").strip() or self._scene_zone()
         scene = self._remember_scene(place, strict=bool(explicit), zone=zone_key)
+        # 提示词里明说的地点压过日程 zone：不然「说在办公室、画到街上」会一直出现
+        try:
+            prompt_scene = place_words_scene(prompt)
+        except Exception:
+            prompt_scene = ""
+        if prompt_scene and prompt_scene != scene:
+            logger.info("[amo_image] 场景以提示词为准：%s -> %s"
+                        % (place or zone_key or "-", prompt_scene[:12]))
+            scene = prompt_scene
         activity_text = str(activity or "").strip() or self._scene_activity()
         # selfie 是 Amo 的明确判定；没给才由我们按提示词推
         selfie_flag = self._is_selfie(prompt, forced=selfie)

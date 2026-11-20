@@ -488,3 +488,34 @@ def split_prompts(text: str, limit: int = 4) -> list[str]:
         raw = raw.replace(sep, "\u0000")
     parts = [item.strip() for item in raw.split("\u0000")]
     return [item for item in parts if item][: max(1, int(limit or 1))]
+
+#: 提示词里明说的地点 → 场景。优先级高于日程 zone：
+#: 否则会出现「她说在办公室自拍，照片背景却是街上」（日程刚好换格、或缓存还是上一格）。
+#: 顺序重要：先具体词，再泛词（「公司楼下的街上」会先命中「街上」）。
+PLACE_WORDS = (
+    (("办公室", "工位", "会议室", "写字楼", "公司楼下"), "office"),
+    (("街上", "路边", "马路", "人行道", "街头", "路上", "路上走"), "street"),
+    (("地铁", "站台", "换乘"), "commute"),
+    (("咖啡馆", "咖啡厅", "咖啡店", "奶茶店"), "cafe"),
+    (("餐厅", "饭馆", "火锅店", "食堂", "小吃店"), "restaurant"),
+    (("商场", "购物中心", "超市"), "mall"),
+    (("公园", "草坪", "长椅"), "park"),
+    (("酒店", "宾馆", "客房"), "hotel"),
+    (("卧室", "床上", "被窝"), "bedroom"),
+    (("家里", "客厅", "沙发", "阳台", "厨房"), "home"),
+    (("高铁站", "火车站", "机场", "候车"), "station"),
+    (("景区", "山上", "湖边", "海边", "古镇"), "scenic"),
+    (("公司", "上班", "加班"), "office"),
+)
+
+
+def place_words_scene(text: str = "") -> str:
+    """从提示词里认出地点词，返回对应场景；认不出返回空。"""
+    body = str(text or "")
+    if not body:
+        return ""
+    for words, zone in PLACE_WORDS:
+        for word in words:
+            if word in body:
+                return ZONE_SCENES.get(zone, "")
+    return ""
