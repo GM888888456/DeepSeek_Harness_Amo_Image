@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f4f4f6" />
+  <title>我想永远陪着你-相片</title>
+  <link rel="stylesheet" href="./style.css?v=1.8.7" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand"><span class="dot"></span><span>我想永远陪着你-相片</span></div>
+      <button class="icon-btn" id="theme" title="切换深浅色">◐</button>
+    </header>
+
+
+    <nav class="tabs">
+      <button class="tab on" data-tab="status">概览</button>
+      <button class="tab" data-tab="wardrobe">服装</button>
+      <button class="tab" data-tab="voice">语音</button>
+      <button class="tab" data-tab="history">记录</button>
+    </nav>
+
+    <section class="pane" id="pane-status">
+      <div class="card">
+        <div class="card-title">
+          <span>后端</span>
+          <span class="pill" id="enablePill">…</span>
+        </div>
+        <dl class="kv">
+          <dt>类型</dt><dd id="providerName">—</dd>
+          <dt>地址</dt><dd id="apiBase">—</dd>
+          <dt>模型</dt><dd id="modelName">—</dd>
+          <dt>尺寸</dt><dd id="sizeText">—</dd>
+          <dt>密钥</dt><dd id="keyMasked">—</dd>
+          <dt>今日</dt><dd id="usedToday">—</dd>
+          <dt>累计</dt><dd id="callsTotal">—</dd>
+        </dl>
+        <div class="meta" id="statusMeta">加载中…</div>
+      </div>
+    </section>
+
+    <section class="pane" id="pane-config" hidden>
+      <div class="card">
+        <div class="card-title"><span>开关</span><span class="hint">文字、数字、密钥这类填写项在 AstrBot「插件设置」里改</span></div>
+        <label class="check"><input type="checkbox" id="enable" /> 启用生图</label>
+        <label class="check"><input type="checkbox" id="mount_only" /> 只当执行者（听 Amo 的）</label>
+        <label class="check"><input type="checkbox" id="use_memory_context" /> 接记忆上下文</label>
+        <label class="check"><input type="checkbox" id="allow_private" /> 私聊可用</label>
+        <label class="check"><input type="checkbox" id="allow_group" /> 群聊可用</label>
+        <label class="check"><input type="checkbox" id="require_at_in_group" /> 群里必须真 @</label>
+        <label class="check"><input type="checkbox" id="quote_in_group" /> 群里引用原消息</label>
+        <label class="check"><input type="checkbox" id="safe_mode" /> 内容边界</label>
+        <label class="check"><input type="checkbox" id="lock_scene_to_schedule" /> 场景 / 活动锁定日程</label>
+      </div>
+
+      <div class="card" hidden>
+        <div class="card-title"><span>后端</span><span class="hint" id="presetHint">选预设会填地址和模型</span></div>
+        <div class="field">
+          <label>预设</label>
+          <select id="preset"><option value="">手动填写</option></select>
+        </div>
+        <div class="field">
+          <label>类型</label>
+          <select id="provider">
+            <option value="openai">openai（/images/generations）</option>
+            <option value="openai_chat">openai_chat（/chat/completions）</option>
+            <option value="gemini">gemini（原生 generateContent）</option>
+            <option value="custom">custom（自定义端点）</option>
+          </select>
+        </div>
+        <div class="field"><label>api_base</label><input id="api_base" spellcheck="false" placeholder="https://api.openai.com/v1" /></div>
+        <div class="field"><label>api_key</label><input id="api_key" type="password" spellcheck="false" placeholder="留空 = 不修改" /></div>
+        <div class="field">
+          <label>model（拉取后选择）</label>
+          <div class="row">
+            <select id="model" class="grow"></select>
+            <button class="link" id="fetchModels" type="button">拉取</button>
+          </div>
+          <div class="meta" id="modelHint">切到配置页会自动拉取</div>
+          <input id="modelManual" hidden spellcheck="false" placeholder="后端没返回图片模型时，在这里手填一次" />
+        </div>
+        <div class="grid2">
+          <div class="field"><label>size</label><input id="size" spellcheck="false" placeholder="1024x1024" /></div>
+          <div class="field"><label>aspect_ratio</label><input id="aspect_ratio" spellcheck="false" placeholder="留空自动" /></div>
+          <div class="field"><label>n</label><input id="n" type="number" min="1" /></div>
+          <div class="field"><label>quality</label><input id="quality" spellcheck="false" placeholder="留空不发" /></div>
+        </div>
+        <div class="field"><label>负面提示词</label><textarea id="negative_prompt" rows="2" spellcheck="false"></textarea></div>
+        <label class="check"><input type="checkbox" id="chat_modalities" /> Chat 通道要求图片模态（modalities）</label>
+
+        <div id="customBlock" hidden>
+          <div class="field"><label>custom_url（完整地址）</label><input id="custom_url" spellcheck="false" /></div>
+          <div class="field"><label>custom_body（JSON 模板）</label><textarea id="custom_body" rows="3" spellcheck="false"></textarea></div>
+          <div class="field"><label>custom_response_path</label><input id="custom_response_path" spellcheck="false" placeholder="data.images[0].url" /></div>
+        </div>
+      <div class="sep"></div>
+        <div class="card-title">
+          <span>人设一致性</span>
+          <button class="link" id="extractPersona">从人格提取</button>
+        </div>
+        <div class="meta" id="personaHint">读陪伴的人格设定，自动填外观、性别和角色名</div>
+        <div class="field"><label>外观（脸、眼睛、体型）</label><textarea id="character_appearance" rows="2"></textarea></div>
+        <div class="grid2">
+          <div class="field"><label>性别</label>
+            <select id="character_gender">
+              <option value="自动">自动</option>
+              <option value="女">女</option>
+              <option value="男">男</option>
+            </select>
+          </div>
+          <div class="field"><label>角色名 / 一句话人设</label><input id="character_persona" placeholder="留空用陪伴的人格名" /></div>
+          <div class="field"><label>拍摄角度</label>
+            <select id="camera_mode">
+              <option value="自动">自动</option>
+              <option value="自拍">自拍</option>
+              <option value="他拍">他拍</option>
+            </select>
+          </div>
+          <div class="field"><label>发型（固定）</label><input id="character_hairstyle" /></div>
+          <div class="field"><label>换装冷却（分钟）</label><input id="outfit_change_cooldown_minutes" type="number" min="0" /></div>
+        </div>
+        <div class="field"><label>服装池（每行一套）</label><textarea id="character_outfits" rows="3"></textarea></div>
+      <div class="sep"></div>
+        <div class="card-title"><span>使用限制</span></div>
+        <div class="grid2">
+          <div class="field"><label>冷却（秒）</label><input id="cooldown_seconds" type="number" min="0" /></div>
+          <div class="field"><label>私聊每日</label><input id="private_daily_limit" type="number" min="0" /></div>
+          <div class="field"><label>批量上限（张）</label><input id="batch_max" type="number" min="1" /></div>
+          <div class="field"><label>群聊每日 / 群</label><input id="group_daily_limit" type="number" min="0" /></div>
+          <div class="field"><label>发图前缀</label><input id="reply_prefix" /></div>
+        </div>
+        <div class="field"><label>被拦时的回复</label><input id="blocked_reply" /></div>
+      </div>
+
+      <div class="row">
+        <button class="btn" id="save">保存配置</button>
+        <span class="hint" id="saveHint">保存后立即生效</span>
+      </div>
+    </section>
+
+
+    <section class="pane" id="pane-voice" hidden>
+      <div class="card">
+        <div class="card-title"><span>语音（影音内置）</span><span class="pill" id="vPill">…</span></div>
+        <dl class="kv">
+          <dt>后端</dt><dd id="vProvider">—</dd>
+          <dt>音色数</dt><dd id="vCount">—</dd>
+          <dt>今日已用</dt><dd id="vUsed">—</dd>
+          <dt>默认音色</dt><dd id="vDefault">—</dd>
+        </dl>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="vRefresh" type="button">刷新</button>
+          <button class="btn" id="vPull" type="button">拉取音色</button>
+        </div>
+        <div class="meta" id="vHint">—</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>音色库</span></div>
+        <ul class="list" id="vList"><li class="empty">加载中…</li></ul>
+      </div>
+    </section>
+    <section class="pane" id="pane-wardrobe" hidden>
+      <div class="card">
+        <div class="card-title">
+          <span>她今天穿</span>
+          <span class="pill" id="wearNow">—</span>
+        </div>
+        <div class="meta" id="wardrobeMeta">读命中…</div>
+      <div class="sep"></div>
+        <div class="card-title">
+          <span>服装库</span>
+          <button class="link" id="wRefresh">刷新</button>
+        </div>
+        <ul class="list" id="wList">
+          <li class="empty">衣柜空的——衣服从市场买，她会自己挑</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="pane" id="pane-history" hidden>
+      <div class="card">
+        <div class="card-title">
+          <span>最近画的</span>
+          <button class="link" id="refresh">刷新</button>
+        </div>
+        <ul class="list" id="history">
+          <li class="empty">还没有记录</li>
+        </ul>
+      </div>
+    </section>
+
+    <footer class="foot">Astrbot_Amo_Image · 反馈 QQ 群 100000001</footer>
+  </div>
+  <script type="module" src="./app.js?v=1.8.5"></script>
+</body>
+</html>
