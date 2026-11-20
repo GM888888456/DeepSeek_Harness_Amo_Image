@@ -474,9 +474,20 @@ class AmoImagePlugin(Star):
             logger.error("[amo_media] 语音模块启动失败（影音只剩生图）: %s" % exc)
             return None
 
-    @staticmethod
-    def _speech_config():
-        """读语音插件自己的配置（config/DeepSeek_Harness_Amo_Speech_config.json）。"""
+    #: 面板（终端「语音」页）写进影音配置的这些键，要盖到语音子插件上，
+    #: 否则出现「面板改了没用、真正生效的是另一份文件」的两套配置。
+    # 注意：cooldown_seconds / enable 是语音和生图**共用**的键，不能覆盖，
+    # 语音的群聊冷却放在语音自己的配置里（cooldown_seconds=300）。
+    VOICE_TUNING_KEYS = ("group_enable", "auto_fallback", "daily_quota",
+                         "private_cooldown_seconds",
+                         "max_chars", "max_segments", "speak_threshold", "timeout", "speed")
+
+    def _speech_config(self):
+        """读语音插件自己的配置，再用面板（影音配置）里的调音键覆盖。
+
+        这样「面板改了就生效」，而 api_key / provider / model 这些仍然只从
+        config/DeepSeek_Harness_Amo_Speech_config.json 来。
+        """
         names = ("DeepSeek_Harness_Amo_Speech", "Astrbot_Amo_Speechsound",
                  "deepseek_harness_amo_speech", "deepseek_harness_amo_speechsound")
         base = ""
@@ -497,6 +508,13 @@ class AmoImagePlugin(Star):
                     data = dict(loaded)
                     break
         data["web_prefix"] = "/sp"
+        try:
+            panel = self.config if isinstance(self.config, dict) else {}
+            for key in self.VOICE_TUNING_KEYS:
+                if key in panel and panel[key] is not None:
+                    data[key] = panel[key]
+        except Exception as exc:
+            logger.debug("[amo_voice] 面板配置覆盖失败: %s" % exc)
         return data
 
     @filter.llm_tool(name="amo_speak")

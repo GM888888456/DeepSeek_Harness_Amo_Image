@@ -235,7 +235,7 @@
   "group_daily_limit": {
     "type": "int",
     "description": "群聊每日次数",
-    "default": 20,
+    "default": 5,
     "hint": "按群算，每个群每天最多几张；0=不限。"
   },
   "reply_prefix": {

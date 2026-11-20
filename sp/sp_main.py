@@ -279,6 +279,7 @@ class SpeechSoundPlugin(Star):
             self._state = {}
         self._state.setdefault("date", _today())
         self._state.setdefault("count", 0)
+        self._state.setdefault("count_by_umo", {})
         self._state.setdefault("last_ts", 0)
         self._state.setdefault("last_ts_by_umo", {})
         self._state.setdefault("scene_voices", {})
@@ -314,25 +315,42 @@ class SpeechSoundPlugin(Star):
         except Exception as exc:
             logger.debug("[amo_voice] 音色缓存写入失败: %s" % exc)
 
-    def _quota_left(self, private: bool = False) -> int:
-        """私聊不限量（用户自己承担成本）；群聊所有群共用一份每日额度。"""
+    def _roll_day(self) -> None:
+        """跨天就把群聊计数清零（总量 + 每个群各自一份）。"""
+        if self._state.get("date") != _today():
+            self._state["date"] = _today()
+            self._state["count"] = 0
+            self._state["count_by_umo"] = {}
+            self._save_state()
+
+    def _quota_left(self, private: bool = False, umo: str = "") -> int:
+        """私聊不限量（用户自己承担成本）；群聊**每个群各自**一份每日额度。
+
+        2026-11-20 用户口径：每群每天图片 5、语音 10，私聊不限。
+        """
         if private:
             return -1
         quota = self._int("daily_quota", 10)
         if quota <= 0:
             return -1
-        if self._state.get("date") != _today():
-            self._state["date"] = _today()
-            self._state["count"] = 0
-            self._save_state()
-        return max(0, quota - int(self._state.get("count") or 0))
+        self._roll_day()
+        per = self._state.setdefault("count_by_umo", {})
+        record = per.get(str(umo or "")) or {}
+        if str(record.get("date") or "") != _today():
+            return quota
+        return max(0, quota - int(record.get("count") or 0))
 
     def _bump_usage(self, umo: str = "", private: bool = False) -> None:
-        if self._state.get("date") != _today():
-            self._state["date"] = _today()
-            self._state["count"] = 0
+        self._roll_day()
         if not private:
             self._state["count"] = int(self._state.get("count") or 0) + 1
+            key = str(umo or "")
+            per = self._state.setdefault("count_by_umo", {})
+            record = per.get(key) or {}
+            if str(record.get("date") or "") != _today():
+                record = {"date": _today(), "count": 0}
+            record["count"] = int(record.get("count") or 0) + 1
+            per[key] = record
         self._state["last_ts"] = _now()
         if umo:
             per = self._state.setdefault("last_ts_by_umo", {})
@@ -579,7 +597,7 @@ class SpeechSoundPlugin(Star):
             text=text,
             private=bool(event.is_private_chat()),
             hour=now.hour,
-            quota_left=self._quota_left(bool(event.is_private_chat())),
+            quota_left=self._quota_left(bool(event.is_private_chat()), self._session_key(event)),
             seconds_since_last=(_now() - last_ts) if last_ts else 1e9,
             cooldown=self._int("cooldown_seconds", 240),
             private_cooldown=self._int("private_cooldown_seconds", 0),
