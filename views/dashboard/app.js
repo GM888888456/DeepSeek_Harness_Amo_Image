@@ -153,16 +153,26 @@ async function loadVoice() {
       list.appendChild(li);
       return;
     }
+    const current = v.default_voice || "";
     items.slice(0, 120).forEach((item) => {
+      const vid = item.id || item.voice_id || "";
       const li = document.createElement("li");
+      li.style.cursor = "pointer";
+      const isCur = vid && vid === current;
+      if (isCur) li.style.background = "rgba(255,105,180,.12)";
       const name = document.createElement("span");
       name.className = "p";
-      name.textContent = item.name || item.id || "音色";
+      name.textContent = (item.name || vid || "音色") + (isCur ? "（当前）" : "");
       const tag = document.createElement("span");
       tag.className = "s";
-      tag.textContent = item.scene || item.gender || "";
+      tag.textContent = item.gender || item.scene || "点击设为默认";
       li.appendChild(name);
       li.appendChild(tag);
+      li.addEventListener("click", async () => {
+        if (!vid) return;
+        try { await post("sp/voices/scene", { scene: "default", voice: vid }); } catch (e) {}
+        loadVoice();
+      });
       list.appendChild(li);
     });
   } catch (e) {}
