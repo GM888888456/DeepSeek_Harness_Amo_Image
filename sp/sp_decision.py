@@ -297,8 +297,19 @@ def decide(ctx: SpeakContext, *, manual: bool = False, ignore_score: bool = Fals
     score, tags = score_speech(ctx, clean)
 
     if manual:
-        if ctx.effective_cooldown > 0 and ctx.seconds_since_last < ctx.effective_cooldown:
-            score = max(score, 0.0)
+        # 工具调用（amo_speak）以前只把分数清零就放行，等于完全绕过冷却：
+        # 群聊里会出现 20 秒一条、连着发的情况（2026-11-20 用户报「一直在发语音」）。
+        # 冷却对主动调用同样生效；真要强制发（面板 /speak 调试）走 ignore_score。
+        cd = ctx.effective_cooldown
+        if cd > 0 and ctx.seconds_since_last < cd and not ignore_score:
+            return Decision(
+                False,
+                "冷却中：距上一条语音不到 %d 秒（%s）" % (cd, "私聊" if ctx.private else "群聊"),
+                max(score, 0.0),
+                scene,
+                clean,
+                tags + ["冷却"],
+            )
         return Decision(True, "Amo 主动开口", max(score, 0.7), scene, clean, tags + ["主动"])
 
     cd = ctx.effective_cooldown
