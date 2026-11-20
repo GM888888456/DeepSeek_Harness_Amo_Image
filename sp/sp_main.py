@@ -428,29 +428,29 @@ class SpeechSoundPlugin(Star):
     # ------------------------------------------------------------------
 
     def _provider(self):
-        # 语音后端必须是**独立配置**：以前和生图共用 provider/api_base/api_key，
-        # 生图换成星桥之后，语音拿着星桥的 key 去调 Breeze，一直 401。
-        name = (self._str("voice_provider") or "edge").strip().lower() or "edge"
+        # 语音用的是**它自己的配置**（config/DeepSeek_Harness_Amo_Speech_config.json），
+        # 不是生图那份；以前两者混在一起，生图换站后语音会拿着生图 key 去调 Breeze（401）。
+        name = (self._str("provider") or "breeze").strip().lower() or "breeze"
         stamp = "|".join(
             [
                 name,
-                self._str("voice_api_base"),
-                self._str("voice_api_key"),
-                self._str("voice_model_id"),
-                self._str("voice_default_voice"),
-                self._str("voice_edge_voice"),
+                self._str("api_base"),
+                self._str("api_key"),
+                self._str("model_id"),
+                self._str("default_voice"),
+                self._str("edge_voice"),
                 str(self._int("timeout", 30)),
             ]
         )
         if self._provider_cache and self._provider_cache[0] == stamp:
             return self._provider_cache[1]
         settings = {
-            "api_base": self._str("voice_api_base"),
-            "api_key": self._str("voice_api_key"),
+            "api_base": self._str("api_base"),
+            "api_key": self._str("api_key"),
             "timeout": self._int("timeout", 30),
-            "model_id": self._str("voice_model_id"),
-            "default_voice": self._str("voice_default_voice"),
-            "edge_voice": self._str("voice_edge_voice", "zh-CN-XiaoxiaoNeural"),
+            "model_id": self._str("model_id"),
+            "default_voice": self._str("default_voice"),
+            "edge_voice": self._str("edge_voice", "zh-CN-XiaoxiaoNeural"),
         }
         provider = build_provider(name, settings)
         self._provider_cache = (stamp, provider)
