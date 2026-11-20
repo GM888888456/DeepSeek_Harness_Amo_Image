@@ -356,6 +356,8 @@ class SpeechSoundPlugin(Star):
             manual=manual, source=source, with_text=False,
         )
         if result.get("ok"):
+            # 真的发出去了：标记成「已发出」，让陪伴插件按这个决定正文要不要重复
+            self._mark_spoken_text(event, text, ok=True)
             return result
         # 没出成声：撤掉标记（正文照常发）；但如果陪伴插件已经按标记把正文撤掉了，
         # 这里得自己补一条，别让他一个字都收不到。
@@ -393,6 +395,14 @@ class SpeechSoundPlugin(Star):
                 return
             event.amo_spoken_text = str(text)
             event.amo_spoken_ok = bool(ok)
+            # 一轮里可能念了好几段：全留着，陪伴插件要逐段比对正文
+            try:
+                spoken = list(getattr(event, "amo_spoken_texts", None) or [])
+                if str(text) not in spoken:
+                    spoken.append(str(text))
+                    event.amo_spoken_texts = spoken[-6:]
+            except Exception:
+                pass
         except Exception:  # noqa: BLE001
             pass
 
