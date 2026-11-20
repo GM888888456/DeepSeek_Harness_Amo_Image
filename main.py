@@ -23,6 +23,7 @@ import tempfile
 import time
 import unicodedata
 import zlib
+from datetime import datetime, timedelta, timezone
 from collections import deque
 
 from astrbot.api import logger
@@ -367,7 +368,8 @@ def build_prompt(appearance: str, prompt: str, context_lines=None, look: str = "
                  no_prop: bool = False,
                  look_label: str = "今天的样子：",
                  selfie_text: str = "",
-                 hairstyle: str = "") -> str:
+                 hairstyle: str = "",
+                 lighting: str = "") -> str:
     """拼最终提示词：性别 → 角色 → 外观 → 今日固定造型 → 地点/在干嘛 → 要求 → 上下文。
 
     性别和角色放在最前面，是因为模型默认会「猜」人物：不写性别就容易画出男的，
@@ -421,6 +423,9 @@ def build_prompt(appearance: str, prompt: str, context_lines=None, look: str = "
             parts.append("此刻在" + where)
     elif doing and doing not in body:
         parts.append("正在" + doing[:40])
+    if str(lighting or "").strip():
+        # 时间/光线单独一条：以前完全没算时刻，晚上也照着大白天画
+        parts.append(str(lighting).strip())
     if body.strip():
         parts.append(body.strip())
     if context_lines:
@@ -1559,6 +1564,77 @@ class AmoImagePlugin(Star):
         text = str(prompt or "")
         return any(word in text for word in self.FOOD_PROP_WORDS)
 
+    #: 常见城市 → IANA 时区。中国城市不逐个列，没命中的按北京时间。
+    CITY_TZ = {
+        "东京": "Asia/Tokyo", "大阪": "Asia/Tokyo", "首尔": "Asia/Seoul",
+        "新加坡": "Asia/Singapore", "曼谷": "Asia/Bangkok", "吉隆坡": "Asia/Kuala_Lumpur",
+        "迪拜": "Asia/Dubai", "伦敦": "Europe/London", "巴黎": "Europe/Paris",
+        "柏林": "Europe/Berlin", "莫斯科": "Europe/Moscow", "纽约": "America/New_York",
+        "洛杉矶": "America/Los_Angeles", "旧金山": "America/Los_Angeles",
+        "西雅图": "America/Los_Angeles", "温哥华": "America/Vancouver",
+        "多伦多": "America/Toronto", "悉尼": "Australia/Sydney",
+        "墨尔本": "Australia/Melbourne", "奥克兰": "Pacific/Auckland",
+        "檀香山": "Pacific/Honolulu",
+    }
+    #: 没有 tzdata 时的固定偏移兜底（够用即可，不追求夏令时）
+    TZ_FALLBACK_HOURS = {
+        "Asia/Shanghai": 8, "Asia/Tokyo": 9, "Asia/Seoul": 9, "Asia/Singapore": 8,
+        "Asia/Bangkok": 7, "Asia/Kuala_Lumpur": 8, "Asia/Dubai": 4, "Europe/London": 0,
+        "Europe/Paris": 1, "Europe/Berlin": 1, "Europe/Moscow": 3,
+        "America/New_York": -5, "America/Los_Angeles": -8, "America/Vancouver": -8,
+        "America/Toronto": -5, "Australia/Sydney": 10, "Australia/Melbourne": 10,
+        "Pacific/Auckland": 12, "Pacific/Honolulu": -10,
+    }
+
+    def _tz_for_place(self, place: str = ""):
+        """她在的地方是哪个时区。**不写死 UTC+8**：
+        地方名里命中已知城市就用那个城市的时区，没命中默认北京时间（数据都是国内的）。
+        """
+        text = str(place or "")
+        for name, zone in self.CITY_TZ.items():
+            if name and name in text:
+                return zone, name
+        return "Asia/Shanghai", ""
+
+    def _now_for_place(self, place: str = ""):
+        """按她所在地算「现在」。容器是 UTC，直接 datetime.now() 会差 8 小时。"""
+        tz_name, city = self._tz_for_place(place)
+        try:
+            from zoneinfo import ZoneInfo
+            return datetime.now(ZoneInfo(tz_name)), tz_name, city
+        except Exception:
+            hours = self.TZ_FALLBACK_HOURS.get(tz_name, 8)
+            return datetime.now(timezone(timedelta(hours=hours))), tz_name, city
+
+    def _time_of_day_clause(self, place: str = "") -> str:
+        """此刻她所在地的光线与时段。出图最容易漏的就是这个：
+        2026-11-20 晚上 19 点，浙江和贵阳都天黑了，照片还是大白天——
+        因为提示词里从来没有时刻。
+        """
+        try:
+            now, tz_name, city = self._now_for_place(place)
+        except Exception:
+            return ""
+        hour = now.hour
+        if 5 <= hour < 8:
+            desc = "清晨，天刚亮，光是柔和的冷调，不要正午的强光"
+        elif 8 <= hour < 11:
+            desc = "上午，白天自然光，光线清亮"
+        elif 11 <= hour < 14:
+            desc = "正午到午后，光线明亮偏白"
+        elif 14 <= hour < 17:
+            desc = "下午，白天自然光，光偏暖"
+        elif 17 <= hour < 19:
+            desc = "傍晚，夕阳斜照，天色偏暖偏暗，影子拉长"
+        elif 19 <= hour < 22:
+            desc = "晚上，窗外已经全黑，室内是暖色灯光，脸上有灯下的柔光"
+        else:
+            desc = "深夜，窗外一片黑，只有室内灯光或路灯，画面整体偏暗"
+        label = city or str(place or "")[:14] or tz_name
+        where = "（%s，%s）" % (label, tz_name) if city else "（%s）" % label
+        return "此刻是她所在地的 %d:%02d %s，%s。画面光线必须符合这个时间，不要画成白天。" % (
+            hour, now.minute, where, desc)
+
     def _final_prompt(self, prompt, context_lines=None, selfie=None,
                       place=None, activity=None, zone=None):
         scheduled = self._scheduled_outfit()
@@ -1605,6 +1681,7 @@ class AmoImagePlugin(Star):
             camera=self._camera(prompt, forced=selfie),
             scene=scene_anchor(place, scene, zone=zone_key),
             pose=pose_text,
+            lighting=self._time_of_day_clause(place),
             face=self._face_clause(),
             selfie=selfie_flag,
             selfie_text=selfie_directive(style_seed) if selfie_flag else "",
