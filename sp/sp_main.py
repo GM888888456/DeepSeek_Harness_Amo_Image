@@ -528,7 +528,7 @@ class SpeechSoundPlugin(Star):
 
     def _companion_snapshot(self, event: AstrMessageEvent) -> dict[str, str]:
         """从陪伴插件读「此刻在哪、在做什么、关系多近」。任何一个读不到都返回空串。"""
-        out = {"place": "", "activity": "", "relation": ""}
+        out = {"place": "", "activity": "", "relation": "", "emotion": "", "emotion_strength": "0"}
         if not (self._bool("schedule_aware", True) or self._bool("read_relation", True)):
             return out
         companion = self._companion()
@@ -545,6 +545,23 @@ class SpeechSoundPlugin(Star):
                         out["activity"] = str(activity.get("activity") or "")
                 except Exception:
                     pass
+
+        # 心情：Terminal 那边已经算好的七情六欲，直接带过来，不再让语音层对着台词瞎猜
+        try:
+            state = getattr(companion, "state", None)
+            word = str(state.feel_word() or "") if state is not None else ""
+            feel = state.feel_snapshot() if state is not None else {}
+            base = float((feel or {}).get("base") or 34.0)
+            devs = {k: float((feel or {}).get(k) or base) - base
+                    for k in ("anger", "sadness", "joy", "love", "fear", "fatigue")}
+            top = max(devs, key=devs.get) if devs else ""
+            strength = max(0.0, min(1.0, float(devs.get(top, 0.0)) / 30.0))
+            scene_map = {"烦躁": "angry", "低落": "sad", "开心": "happy",
+                         "黏人": "tender", "累": "sleep", "不安": "sad"}
+            out["emotion"] = scene_map.get(word, "")
+            out["emotion_strength"] = "%.2f" % strength
+        except Exception as exc:
+            logger.debug("[amo_voice] 读心情失败: %s" % exc)
 
         if self._bool("read_relation", True):
             try:
@@ -608,6 +625,8 @@ class SpeechSoundPlugin(Star):
             relation=snap["relation"],
             place=snap["place"],
             activity=snap["activity"],
+            emotion=snap.get("emotion", ""),
+            emotion_strength=float(snap.get("emotion_strength") or 0.0),
         )
 
     # ------------------------------------------------------------------
@@ -905,6 +924,9 @@ class SpeechSoundPlugin(Star):
         - 内容里有链接、代码、清单、参数说明（念出来是折磨）；
         - 同一段对话刚发过语音，别连着刷；
         - 群里没人要你发语音时别发，很招人烦。
+
+        mood 别留空：带情绪的句子必须填（克制生气/低落/开心/撒娇/困倦），
+        只写声学特征，不写剧情。
 
         Args:
             text(string): 你要说的话，只放要念的内容，不要带括号里的舞台说明。

@@ -174,6 +174,8 @@ class SpeakContext:
     relation: str = ""              # 普通 / 熟识 / 亲近
     place: str = ""                 # 家 / 公司 / 外面
     activity: str = ""
+    emotion: str = ""               # 上游心情（Terminal 七情六欲）：angry/sad/happy/tender/sleep
+    emotion_strength: float = 0.0   # 0~1，偏离常态多少
 
     @property
     def effective_cooldown(self) -> int:
@@ -275,6 +277,15 @@ def decide(ctx: SpeakContext, *, manual: bool = False, ignore_score: bool = Fals
     raw = ctx.text or ""
     clean = sanitize_for_speech(raw)
     scene = detect_scene(clean, ctx)
+    # 上游心情压过关键词：她人设克制，生气/难过时不带「哼/讨厌/哭」这些词，
+    # 只靠词表永远判成日常场景（2026-11-20 语音全程一个调的主因之一）。
+    try:
+        emo = str(getattr(ctx, "emotion", "") or "").strip()
+        power = float(getattr(ctx, "emotion_strength", 0.0) or 0.0)
+        if emo in ("angry", "sad", "happy", "tender", "sleep") and power >= 0.25 and scene != emo:
+            scene = emo
+    except Exception:
+        pass
 
     if not clean:
         return Decision(False, "清洗后没有可念的字", scene=scene, text="", tags=["空"])
@@ -339,12 +350,14 @@ def instructions_for(scene: str, activity: str = "") -> str:
     base = {
         "sleep": "深夜犯困，气声多、语速慢、音量轻，像贴着耳边小声说。",
         "tender": "黏人撒娇，尾音上扬，语气软，带一点笑意。",
-        "sad": "情绪低落，声音发闷，语速偏慢，句尾有点抖。",
-        "angry": "在闹脾气，语气冲、短促，但不吼。",
-        "happy": "心情很好，轻快明亮，带笑。",
+        "sad": "低落但不哭腔：声音发闷，语速偏慢，句尾轻轻落下，气息浅一点。",
+        # 她的生气是克制的：压着火，不是吼
+        "angry": "压着火说话：音高小幅下压，语速稳而略慢，重音收紧，气息变沉，"
+                 "停顿偏冷，音量不抬高——不要吼、不要拖长腔。",
+        "happy": "心情好，轻快明亮，带笑，语速略快一点。",
         "home": "在家里放松地说话，随意、自然，不要播音腔。",
         "out": "在外面说话，音量正常，环境略吵，语速正常。",
-        "default": "像日常聊天一样自然，不要播音腔，不要抑扬顿挫地朗读。",
+        "default": "像平时聊天一样自然地说话，不要播音腔。",
     }.get(scene, "")
     if activity and scene in ("home", "out", "default"):
         base += f"（此刻正在{activity}）"
