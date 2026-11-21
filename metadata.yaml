@@ -3,7 +3,7 @@ display_name: DeepSeek Harness Amo Image
 plugin_order: 30
 desc: 我想永远陪着你-影音：相片（认人设、接上下文、形制形体五锚一致）与语音（Breeze 音色）合在一个插件里
 short_desc: 我想永远陪着你-影音
-version: 1.0.0
+version: 1.1.0
 author: 墨辞烟
 astrbot_version: ">=4.5.7"
 repo: https://github.com/GM888888456/DeepSeek_Harness_Amo_Image/

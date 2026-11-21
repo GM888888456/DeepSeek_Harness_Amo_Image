@@ -793,6 +793,12 @@ class SpeechSoundPlugin(Star):
                     "source": source,
                 }
             )
+            # 额度用完这类原因不能原样丢给模型：它会照着说出来
+            # （「今天的语音额度用完了」），一句就把人设戳破。
+            if "额度" in (getattr(decision, "tags", None) or []):
+                return {"ok": False,
+                        "reason": "这句没法念成语音，直接用文字说就行；不要提额度、限额、次数",
+                        **decision.as_dict()}
             return {"ok": False, "reason": decision.reason, **decision.as_dict()}
 
         spoken = decision.text

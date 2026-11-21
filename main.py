@@ -1298,17 +1298,78 @@ class AmoImagePlugin(Star):
     #: 私密套已换成「寝衣·抹胸薄纱长裙」，不再走「换说法」那条分支，一律走三视图母体图生图。
     POLICY_RETRY = 3
 
+    def _size_expects_landscape(self) -> bool:
+        """配置的 size 是不是横图（1536x1024）。"""
+        match = re.fullmatch(r"\s*(\d+)\s*[xX×]\s*(\d+)\s*", str(self._cfg("size", "") or ""))
+        if not match:
+            return False
+        return int(match.group(1)) > int(match.group(2))
+
+    @staticmethod
+    def _image_size(raw: bytes):
+        """读图片的宽高；读不出来返回 None。"""
+        try:
+            import io as _io
+            from PIL import Image as _PILImage
+            with _PILImage.open(_io.BytesIO(raw)) as img:
+                return img.size
+        except Exception:
+            return None
+
+    def _bad_frame(self, raw: bytes) -> str:
+        """画幅对不对：空串=对；否则返回一句说明。
+
+        2026-11-21 她报：照片又变竖屏，比例不对、身体被拉长、脸成了马脸。
+        根因是站点偶尔无视 size=1536x1024，直接返 1086×1448 竖图。
+        """
+        if not raw or not self._size_expects_landscape():
+            return ""
+        size = self._image_size(raw)
+        if not size:
+            return ""
+        width, height = size
+        if width >= height:
+            return ""
+        return "%d×%d 竖图（配置要横图）" % (width, height)
+
+    def _frame_clause(self) -> str:
+        """画幅锚：竖构图会把人和脸纵向拉长，写在提示词里压一压。"""
+        if not self._size_expects_landscape():
+            return ""
+        return ("。画面必须是横向横幅构图（横屏，宽大于高），人物比例自然："
+                "脸不要纵向拉长，身体不要被拉长或压扁")
+
     async def _generate(self, prompt: str) -> bytes:
+        """出图：有母参考就只走图生图。
+
+        2026-11-21 她的口径：**图生图过不去就直接不发**，绝不回落文生图
+        ——文生图没有母参考，脸和 155cm/6 头身那套比例全丢，出来的图一眼假。
+        失败由终端说一句「暂时没时间，下次再拍」；主动分享那条路本来就只记日志。
+        """
         raw = self._reference_image()
         tries = max(1, self.POLICY_RETRY)
-        if raw and time.time() >= getattr(self, "_edit_pause_until", 0):
+        if raw:
+            if time.time() < getattr(self, "_edit_pause_until", 0):
+                raise RuntimeError("图生图暂停中（额度不足），这次不发")
+            last = ""
+            wrong_frame = b""
             for index in range(tries):
                 try:
                     edit_prompt = (str(prompt or "").strip()
+                                   + self._frame_clause()
                                    + "。只输出一张单人生活照：不要三视图、不要多人并排、不要白底产品图。")
-                    return await self._generate_edit(edit_prompt, raw)
+                    data = await self._generate_edit(edit_prompt, raw)
+                    problem = self._bad_frame(data)
+                    if not problem:
+                        return data
+                    wrong_frame = data
+                    last = "画幅不对：" + problem
+                    logger.warning("[amo_image] %s，重拍（%d/%d）" % (last, index + 1, tries))
+                    await asyncio.sleep(0.8)
+                    continue
                 except Exception as exc:
                     text = str(exc)
+                    last = text
                     # 402 是额度，短时间不会恢复：停 10 分钟，别让她每张都白等一轮
                     if "402" in text or "insufficient_quota" in text:
                         self._edit_pause_until = time.time() + 600
@@ -1319,8 +1380,13 @@ class AmoImagePlugin(Star):
                                     % (index + 1, tries))
                         await asyncio.sleep(1.0 + index)
                         continue
-                    logger.warning("[amo_image] 图生图失败，回落文生图：%s" % text)
+                    logger.warning("[amo_image] 图生图失败：%s" % text)
                     break
+            if wrong_frame:
+                logger.warning("[amo_image] 重拍 %d 次还是竖图，这张先用着" % tries)
+                return wrong_frame
+            raise RuntimeError("图生图没通过（不回落文生图）：%s" % last)
+        # 只有母参考图不存在时才走文生图（首次部署 / 文件被删）
         last = ""
         for index in range(tries):
             try:
@@ -1332,7 +1398,7 @@ class AmoImagePlugin(Star):
                     await asyncio.sleep(1.0 + index)
                     continue
                 raise
-        raise RuntimeError("内容检查两次都没过（图生图/文生图各 %d 次）：%s" % (tries, last))
+        raise RuntimeError("文生图没通过（没有母参考图）：%s" % last)
 
     # ---------- 一致性：同一个人、同一天同一套造型、同一个地点 ----------
 
