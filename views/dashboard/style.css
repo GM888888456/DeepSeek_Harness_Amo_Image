@@ -300,3 +300,23 @@ textarea:focus { outline: none; border-color: var(--pink); }
   cursor: pointer; white-space: nowrap; min-width: 0; }
 .tab:hover { background: transparent; color: var(--text); }
 .tab.on, .tab.active { background: transparent; color: var(--text); box-shadow: none; font-weight: 600; }
+
+/* 衣柜按套装显示：分组标题 + 展开的件名 */
+.list .set-head {
+  justify-content: flex-start;
+  border-bottom: none;
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: .3px;
+  padding: 8px 0 2px;
+}
+.list .sub {
+  justify-content: flex-start;
+  border-bottom: none;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 0 0 4px 8px;
+  white-space: normal;
+  line-height: 1.5;
+}
+.list li .pieces { color: var(--muted); }

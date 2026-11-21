@@ -429,6 +429,35 @@ function renderScenes() {
   });
 }
 
+function wardrobeSetName(name) {
+  const text = String(name || "");
+  return text.indexOf("｜") >= 0 ? text.split("｜")[0].trim() : text.trim();
+}
+
+function wardrobeKind(setName) {
+  if (setName.indexOf("汉服") === 0) return "汉服";
+  if (setName.indexOf("JK") === 0) return "百褶";
+  if (setName.indexOf("百褶") === 0) return "百褶";
+  if (setName.indexOf("寝衣") === 0) return "寝衣";
+  if (setName.indexOf("私密") === 0) return "私密";
+  return "其他";
+}
+
+function groupWardrobeSets(items) {
+  const map = new Map();
+  items.forEach((item) => {
+    const name = wardrobeSetName(item.name);
+    if (!name) return;
+    if (!map.has(name)) map.set(name, []);
+    map.get(name).push(item);
+  });
+  return Array.from(map.entries()).map(([name, pieces]) => ({
+    name: name,
+    pieces: pieces,
+    kind: wardrobeKind(name),
+  }));
+}
+
 function renderWardrobe(data) {
   scenes = data.scenes || scenes;
   if (!scenes.length) return;
@@ -436,41 +465,61 @@ function renderWardrobe(data) {
   els.wearNow.textContent = data.current || "待定";
   els.wearNow.className = "pill" + (data.current ? "" : " off");
   const items = data.items || [];
-  els.wardrobeMeta.textContent = "库里 " + items.length + " 件 · 写入 " + (data.path || "");
-  if (!items.length) {
-    els.wList.innerHTML = '<li class="empty">还没有衣服，先加一件</li>';
+  const sets = groupWardrobeSets(items);
+  els.wardrobeMeta.textContent =
+    "套装 " + sets.length + " 套 · 单件 " + items.length + " 件 · 写入 " + (data.path || "");
+  if (!sets.length) {
+    els.wList.innerHTML = '<li class="empty">衣柜空的——衣服从市场买，她会自己挑</li>';
     return;
   }
-  els.wList.innerHTML = items.map((item) => {
-    const tags = (item.scenes || []).map((key) => {
-      const found = scenes.find((scene) => scene.key === key);
-      return found ? found.label : key;
-    }).join(" / ");
-    const off = item.enabled === false ? " · 已停用" : "";
-    return '<li data-id="' + escapeHtml(item.id) + '">' +
-      '<span class="p">' + escapeHtml(item.name) + "</span>" +
-      '<span class="t">' + escapeHtml(tags + off) + "</span>" +
-      '<button class="link wear" type="button">今天穿</button>' +
-      '<button class="link del" type="button">删</button></li>';
+  const current = String(data.current || "");
+  const order = ["汉服", "百褶", "寝衣", "其他"];
+  els.wList.innerHTML = order.map((kind) => {
+    const group = sets.filter((entry) => entry.kind === kind);
+    if (!group.length) return "";
+    const title = kind + " · " + group.length + " 套" + (kind === "寝衣" ? "（睡觉/在家穿）" : "");
+    return '<li class="empty set-head">' + escapeHtml(title) + "</li>" +
+      group.map((entry) => {
+        const wearing = current.indexOf(entry.name + "｜") >= 0 || current === entry.name;
+        return '<li data-set="' + escapeHtml(entry.name) + '">' +
+          '<span class="p">' + escapeHtml(entry.name) + "</span>" +
+          '<button class="link pieces" type="button">' + entry.pieces.length + " 件</button>" +
+          '<button class="link wear" type="button">' + (wearing ? "穿着中" : "今天穿") + "</button>" +
+          '<button class="link del" type="button">删</button></li>';
+      }).join("");
   }).join("");
-  els.wList.querySelectorAll("li[data-id]").forEach((row) => {
-    const id = row.dataset.id;
+  els.wList.querySelectorAll("li[data-set]").forEach((row) => {
+    const setName = row.dataset.set;
+    const entry = sets.find((item) => item.name === setName);
+    const piecesBtn = row.querySelector(".pieces");
     const wear = row.querySelector(".wear");
     const del = row.querySelector(".del");
+    if (piecesBtn && entry) piecesBtn.addEventListener("click", () => {
+      const next = row.nextElementSibling;
+      if (next && next.classList.contains("sub")) { next.remove(); return; }
+      const line = document.createElement("li");
+      line.className = "empty sub";
+      line.textContent = entry.pieces
+        .map((piece) => String(piece.name || "").split("｜").pop())
+        .join(" / ");
+      row.after(line);
+    });
     if (wear) wear.addEventListener("click", async () => {
-      const name = row.querySelector(".p").textContent;
-      els.wardrobeMeta.textContent = "换装中…";
+      els.wardrobeMeta.textContent = "换装中…（" + setName + " 整套）";
       try {
-        const result = unwrap(await post("wardrobe/wear", { name })) || {};
+        const result = unwrap(await post("wardrobe/wear", { name: setName })) || {};
         els.wardrobeMeta.textContent = result.msg || "换好了";
         await loadWardrobe();
       } catch (err) {
         els.wardrobeMeta.textContent = "换装失败：" + String(err.message || err);
       }
     });
-    if (del) del.addEventListener("click", async () => {
+    if (del && entry) del.addEventListener("click", async () => {
+      if (!window.confirm("删掉整套「" + setName + "」？共 " + entry.pieces.length + " 件")) return;
       try {
-        await post("wardrobe/delete", { id });
+        for (const piece of entry.pieces) {
+          if (piece.id) await post("wardrobe/delete", { id: piece.id });
+        }
         await loadWardrobe();
       } catch (err) {
         els.wardrobeMeta.textContent = "删除失败：" + String(err.message || err);

@@ -315,6 +315,11 @@ JK_FORM = ("服装形制（必须一致）：JK 制服，上衣是水手领或�
            "下装是箱褶/轮褶格裙（褶数按套名写死），配白色短袜与制服鞋；"
            "不许画成连衣裙、和服或随便一条百褶裙")
 
+#: 寝衣（2026-11-21 取代私密套）：抹胸 + 薄纱齐胸长裙 + 薄纱披帛，长及踝。
+NIGHT_FORM = ("服装形制（必须一致）：寝衣式汉服，白色系抹胸（系颈系背）+ 同色薄纱齐胸长裙长及踝 + 薄纱披帛；"
+              "薄但完整遮体，不许画成吊带睡衣、睡袍、内衣或短裙")
+
+
 #: 汉服但套名不在表里时的兜底：不许混朝代、不许画成别国服饰。
 FORM_PLAIN = ("服装形制（必须一致）：整套按同一朝代形制画，不许混搭别的朝代款式"
               "（例如宋制不许出现立领/马面裙），也不许画成和服、韩服或影楼装")
@@ -391,7 +396,7 @@ def market_pattern(name: str) -> str:
     text = str(name or "").strip()
     if not text:
         return ""
-    # 去掉「汉服·」「JK·」这类前缀，只留款型与颜色
+    # 去掉「汉服·」「JK·」「制服·」这类前缀，只留款型与颜色
     body = text.split("·", 1)[-1].strip() if "·" in text else text
     color = _color_of(body)
     style = _style_of(body)
@@ -457,7 +462,11 @@ def set_form(look: str = "") -> str:
             return value
     if "私密" in name:
         return PRIVATE_FORM
-    if "JK" in name.upper():
+    if "寝衣" in name:
+        return NIGHT_FORM
+    # 2026-11-21：衣柜里 10 套 JK 外显改名「百褶」，判定上仍然是 JK（提示词里照写 JK 制服）
+    if ("JK" in name.upper() or "制服" in name or "水手" in name
+            or "格裙" in name or "百褶" in name):
         return JK_FORM
     if "汉服" in name:
         return FORM_PLAIN
