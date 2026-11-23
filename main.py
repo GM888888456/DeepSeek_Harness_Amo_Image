@@ -83,6 +83,7 @@ try:
         POSE_NEGATIVE,
         SELFIE_DIRECTIVE,
         NO_PROP_CLAUSE,
+        REF_ONLY_CLAUSE,
         pose_clause,
         selfie_directive,
         match_scene,
@@ -99,6 +100,7 @@ except Exception:  # pragma: no cover - 直接以脚本方式加载时
         POSE_NEGATIVE,
         SELFIE_DIRECTIVE,
         NO_PROP_CLAUSE,
+        REF_ONLY_CLAUSE,
         pose_clause,
         selfie_directive,
         match_scene,
@@ -864,6 +866,11 @@ class AmoImagePlugin(Star):
             return True
         if len(raw) > 600:
             return False
+        # 2026-11-23（用户口径）：寝衣/私密衣服绝不画到群里
+        for term in ("寝衣", "睡衣", "睡裙", "睡袍", "抹胸", "薄纱", "内衣", "泳衣", "泳装", "私密"):
+            if term in raw:
+                logger.info("[amo_image] 群聊不画私密衣服：命中「%s」" % term)
+                return False
         for term in EXPLICIT_TERMS + MINOR_TERMS + INJECTION_TERMS:
             if self._normalize_text(term) in raw:
                 # 只记命中的词，不记整段提示词（里面有她的穿搭和聊天内容）
@@ -1708,7 +1715,20 @@ class AmoImagePlugin(Star):
         """
         activity = (self._companion_state().get("activity") or {})
         value = str(activity.get("outfit") or "").strip()
-        return self._complete_outfit(value)
+        if value:
+            return self._complete_outfit(value)
+        # 这一格没写衣服时，不能自己换一个池子另抽一套：走终端同一个「当天锁定」，
+        # 否则群里一张淡蓝、私聊一张淡粉。
+        engine = getattr(self._companion(), "outfits", None)
+        getter = getattr(engine, "for_activity", None)
+        if callable(getter):
+            try:
+                got = str(getter(dict(activity), time.strftime("%Y-%m-%d")) or "").strip()
+                if got:
+                    return self._complete_outfit(got)
+            except Exception as exc:
+                logger.debug("[amo_image] 按日程补穿搭失败: %s" % exc)
+        return ""
 
     def _complete_outfit(self, value: str) -> str:
         """把「只写了半套」的穿搭按套名补成整套。"""
@@ -1898,6 +1918,10 @@ class AmoImagePlugin(Star):
         # 他已经指定了姿势（拍照会带「自拍姿势：」）就不再叠自拍池的随机姿势
         pose_text = ("" if "自拍姿势" in str(prompt or "")
                      else pose_clause(selfie_flag, with_prop=with_prop, seed=style_seed))
+        if not pose_text:
+            # 他已经指定了姿势（「自拍姿势：…」）：不覆盖他的姿势，但仍要
+            # 说明参考图只定长相、头别歪——歪头就是从母图抄来的。
+            pose_text = "姿势按上面写的来；头部端正，脸正对镜头；" + REF_ONLY_CLAUSE + "。"
         return build_prompt(
             self._appearance(),
             prompt,
@@ -2001,6 +2025,8 @@ class AmoImagePlugin(Star):
             context_lines = self._clean_context(
                 await self._context_lines(str(umo or ""), str(uid or "")), group
             )
+            # 2026-11-23：画面里出现的吃喝必须先记账，别让她白喝（用户口径）
+            prompt = await self._bill_photo_props(prompt, activity=activity, place=place)
             final_prompt = self._final_prompt(prompt, context_lines, selfie=selfie,
                                              place=place, activity=activity, zone=zone)
             chain.step("prompt", chars=len(final_prompt or ""), place=place, zone=zone)
@@ -2022,6 +2048,35 @@ class AmoImagePlugin(Star):
         else:
             chain.fail("generate", "后端没返回图片")
         return data or None
+
+    async def _bill_photo_props(self, prompt: str, activity: str = "", place: str = "") -> str:
+        """画面里出现的吃喝先记账；买到了把「刚在哪买的什么、多少钱」写进提示词。
+
+        2026-11-23 用户口径：照片里她手里有奶茶，账上就得有这笔钱。买不起就不画那杯，
+        改成「已经喝完、手上空着」——宁可少一样道具，也不要账和照片对不上。
+        """
+        text = "%s %s %s" % (prompt or "", activity or "", place or "")
+        if not self._has_food_prop(text):
+            return prompt
+        companion = self._companion()
+        biller = getattr(companion, "photo_prop_bill", None) if companion is not None else None
+        if not callable(biller):
+            return prompt
+        try:
+            info = await biller(text)
+        except Exception as exc:
+            logger.debug("[amo_image] 照片道具记账失败: %s" % exc)
+            return prompt
+        body = str(prompt or "").rstrip("。，, ")
+        if isinstance(info, dict) and info.get("ok"):
+            line = str(info.get("line") or "").strip()
+            logger.info("[amo_image] 照片道具已记账：%s" % (info.get("item") or ""))
+            return (body + "，" + line) if line else body
+        code = str((info or {}).get("code") or "") if isinstance(info, dict) else ""
+        if code and code != "no_prop":
+            logger.info("[amo_image] 照片里的吃喝没买成（%s），按空着手画" % code)
+            return body + "，手里那份已经喝完吃完，杯子和包装都已经扔掉，手上空着"
+        return prompt
 
     # ---------- 面板照片：世界页那张（自拍 / 一寸证件照 / 上次那张） ----------
     # 2026-11-15 从终端 main.py 搬过来：照片状态、缓存与提示词归生图，
@@ -2958,7 +3013,7 @@ class AmoImagePlugin(Star):
             return
         if not getattr(self, "_mount_logged", False):
             self._mount_logged = True
-            logger.info("[amo_image] 挂载模式：%s"
+            logger.debug("[amo_image] 挂载模式：%s"
                         % ("判定交给 Amo（我名下所有关键词都不抢答）"
                            if self.mount_mode() else "独立模式（自己认词）"))
         if self.mount_mode():

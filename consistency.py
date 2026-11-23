@@ -120,23 +120,31 @@ def selfie_directive(seed: str = "") -> str:
 #: 默认版本（老代码/测试还按常量取）
 SELFIE_DIRECTIVE = selfie_directive()
 
+#: 参考图（母图）只负责「这是谁」：长相、身高比例、发长。
+#: 2026-11-23：歪头姿势就是被母图带出来的（图生图会照抄姿态），所以每次都要
+#: 正向说明「姿势重新摆」，不能指望负面词。
+REF_ONLY_CLAUSE = (
+    "参考图只用来定她的长相、身高比例和发长；姿势、头部朝向、手放哪里都重新摆，"
+    "衣服以文字里写的为准"
+)
+
 #: 自拍姿势：必须拿着手机，但手机不能入镜（前置摄像头的物理事实）。
-#: 另外明确禁止抱臂——这是最常见的「看起来就不对」的姿势。
+#: 全部写成正向句（GPT 图像系列不吃负面词）。
 SELFIE_POSE = (
     "自拍：她一只手拿着手机在拍，手机本身不入镜（前置摄像头看不到手机）；"
-    "另一只手和身体怎么放随场景自然来，不套固定姿势。"
+    "另一只手空着，自然垂在身侧或轻放在身前，手里什么都没有。"
 )
 
-#: 只有提示词明确写了在喝/吃，才允许手里拿饮料或食物。
+#: 只有提示词明确写了在喝/吃，才让她手里拿东西。
 SELFIE_POSE_WITH_PROP = (
     "自拍：她一只手拿着手机在拍，手机本身不入镜（前置摄像头看不到手机）；"
-    "另一只手可以拿着正在吃喝的饮料/食物，动作随场景自然来。"
+    "另一只手拿着提示词里那样吃喝的东西，动作随场景自然。"
 )
 
-#: 提示词没写吃喝时，额外禁止入镜的道具。
+#: 提示词没写吃喝时用的正向道具句（以前是负面词，模型根本不听）。
 NO_PROP_CLAUSE = (
-    "手里不要拿饮料杯、奶茶杯、咖啡杯、吸管或食物；画面里不要出现杯子、"
-    "奶茶、饮料、餐具（提示词没有写正在吃喝）"
+    "两只手都空着：一只手拿手机自己拍，另一只手自然垂在身侧；"
+    "画面里只有她本人和眼前的环境"
 )
 
 #: 他拍姿势：手机在别人手里，画面里不该出现拍摄者。
@@ -230,16 +238,32 @@ def scene_anchor(place: str, fallback_scene: str = "", zone: str = "") -> str:
     return "环境：" + scene + "。" + ENV_LOCK
 
 
+#: 头部/身体朝向池：每次出图按种子换一条。不是固定姿势，是「别每次都歪着」。
+#: 2026-11-23 用户口径：照片不能只有一个姿势，但也不能钉死成一个。
+HEAD_POSE_POOL = (
+    "头部端正，脸正对镜头，双肩水平",
+    "头抬起一点点，下巴线条清楚，视线平视镜头",
+    "身体侧过去一点，肩膀带角度，头转回来正对镜头",
+    "站直，视线平视前方，双手自然放松",
+    "头稍微偏一点点（幅度很小），眼睛看向镜头",
+    "微微低头，抬眼看向镜头",
+)
+
+
+def head_pose(seed: str = "") -> str:
+    """这一次她的头部朝向。同一颗种子取同一条，不同张就换。"""
+    return _pick(HEAD_POSE_POOL, seed)
+
+
 def selfie_pose(seed: str = "", with_prop: bool = False) -> str:
-    """自拍姿势：只保留「一只手拿着手机」，其余交给场景。"""
-    return SELFIE_POSE_WITH_PROP if with_prop else SELFIE_POSE
+    """自拍姿势：一只手拿手机 + 一条正向的头部朝向 + 参考图只定长相。"""
+    base = SELFIE_POSE_WITH_PROP if with_prop else SELFIE_POSE
+    return base + "头部朝向：" + head_pose(seed) + "。" + REF_ONLY_CLAUSE + "。"
 
 
 def pose_clause(selfie: bool, with_prop: bool = False, seed: str = "") -> str:
     if not selfie:
-        return OTHER_POSE
-    if not seed:
-        return SELFIE_POSE_WITH_PROP if with_prop else SELFIE_POSE
+        return OTHER_POSE + "。头部朝向：" + head_pose(seed) + "。" + REF_ONLY_CLAUSE + "。"
     return selfie_pose(seed, with_prop=with_prop)
 
 
