@@ -557,33 +557,6 @@ class AmoImagePlugin(Star):
             logger.debug("[amo_voice] 面板配置覆盖失败: %s" % exc)
         return data
 
-    @filter.llm_tool(name="amo_speak")
-    async def amo_speak(
-        self,
-        event: AstrMessageEvent,
-        text: str = "",
-        mood: str = "",
-        scene: str = "",
-    ) -> str:
-        """把一句话用你自己的声音说出来，发成语音消息。
-
-        什么时候用：用户明确说「发语音」「用语音说」「念给我听」；这句话本身就适合听
-        （晚安、想你、哄人、道歉、祝福、安慰）；此刻情绪比文字更适合用声音表达。
-
-        mood（重要）：只要这句话带情绪，就**必须填 mood**——语音层靠它调语气，
-        留空就按日常语调念，听起来会平。
-        只写声学特征，不写剧情：
-          · 克制生气：音高下压、语速稳而略慢、重音收紧、气息沉、停顿偏冷、音量不抬
-          · 低落：声音发闷、语速慢、句尾下垂、气息浅
-          · 开心：轻快、带笑、语速略快
-          · 撒娇：尾音上扬、语气软、带笑意
-          · 困倦：气声多、语速慢、音量轻
-        """
-        speech = self._speech()
-        if speech is None:
-            return "语音没起来（影音插件的语音模块没加载），这次只发文字。"
-        return await speech.amo_speak(event, text, mood, scene)
-
     @filter.command("speak", alias={"语音"})
     async def cmd_speak(self, event: AstrMessageEvent):
         """/speak <文本>：手动合成一条语音，方便调试音色。"""
