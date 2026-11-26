@@ -222,6 +222,8 @@ ZONE_SCENES: dict[str, str] = {
     "work": "现代写字楼办公室，玻璃幕墙，浅灰色地毯，白色工位隔断，窗外是城市天际线",
     "commute": "城市地铁站站台，灰色瓷砖墙面，顶部一排白色灯管，对面是蓝底白字的站名指示牌",
     "road": "城市街道，人行道铺着浅色地砖，路边一排行道树，身后是沿街店铺",
+    "car": "豪车后排车厢内，米色真皮座椅与深色内饰，车窗外城市街景掠过、带出流动的光斑，"
+           "车内顶灯柔和",
     "mall": "商场内部，浅色抛光地砖，两侧是玻璃橱窗店铺，头顶是连续的白光条形灯带",
     # 12.7.0 日程枚举新增的三个 zone：缺了它们，照片背景会退化成随机环境
     # （日程写着在卧室、照片却在咖啡馆），看起来就像她记错了地方。
@@ -250,6 +252,10 @@ def match_scene(place: str, zone: str = "") -> str:
     """
     text = str(place or "").strip()
     key = str(zone or "").strip().lower()
+    # 2026-11-26（用户口径）：她是大小姐，坐 A8 后排——车上可以自拍、可以拍窗外，
+    # 所以「车内」优先于 zone=road 的街道取景。
+    if any(w in text for w in ("车上", "车内", "后排", "坐车", "车厢")):
+        return ZONE_SCENES.get("car", "")
     strong = bool(text) and any(word in text for word in PLACE_STRONG)
     if key in ZONE_SCENES and not strong:
         return ZONE_SCENES[key]
@@ -628,7 +634,8 @@ def split_prompts(text: str, limit: int = 4) -> list[str]:
 #: 顺序重要：先具体词，再泛词（「公司楼下的街上」会先命中「街上」）。
 PLACE_WORDS = (
     (("办公室", "工位", "会议室", "写字楼", "公司楼下"), "office"),
-    (("街上", "路边", "马路", "人行道", "街头", "路上", "路上走"), "street"),
+    (("车上", "车内", "后排", "坐车", "在车里", "车厢"), "car"),
+    (("街上", "路边", "马路", "人行道", "街头", "路上走"), "street"),
     (("地铁", "站台", "换乘"), "commute"),
     (("咖啡馆", "咖啡厅", "咖啡店", "奶茶店"), "cafe"),
     (("餐厅", "饭馆", "火锅店", "食堂", "小吃店"), "restaurant"),
