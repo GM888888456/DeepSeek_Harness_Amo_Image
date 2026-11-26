@@ -1,0 +1,48 @@
+/* 兼容层：只把各面板用到、终端没有的类，按终端的尺度补上（值取自终端） */
+.card-title { display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+              padding-bottom:10px; margin-bottom:12px; border-bottom:1px solid var(--line); }
+.card-title span:first-child { font-size:16px; font-weight:650; letter-spacing:.3px; }
+.card-title .pill, .card-title .hint { font-weight:400; }
+.kv { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; margin:0; }
+.kv dt { color:var(--muted); font-size:12.5px; }
+.kv dd { margin:0; text-align:right; font-size:13px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.list { list-style:none; margin:0; padding:0; }
+.list li { display:flex; justify-content:space-between; align-items:baseline; gap:10px;
+           padding:7px 0; border-bottom:1px solid var(--line); font-size:13px; }
+.list li:last-child { border-bottom:0; }
+.list .p { font-variant-numeric:tabular-nums; }
+.list .s, .list .t { color:var(--muted); font-size:12px; }
+.list .ok { color:var(--ok); } .list .bad { color:var(--pink2); }
+.list .empty, .empty { color:var(--muted); text-align:center; padding:16px 0; font-size:13px; }
+.list .set-head { color:var(--muted); font-size:12px; padding-top:8px; }
+.list-li-actions, .list li .wear, .list li .del, .link { color:var(--muted); font-size:12px;
+  cursor:pointer; border-bottom:1px dotted var(--line); }
+.list li .wear:hover, .link:hover { color:var(--pink); }
+.link.wear { color:var(--pink); }
+.btn { border-radius:12px; padding:11px 12px; font-size:13px; }
+.btn.sm, .icon-btn { padding:4px 9px; font-size:12px; border-radius:8px; }
+.btn.primary { background:var(--pink); border-color:transparent; color:#fff; }
+.btn.save-top { padding:4px 9px; font-size:12px; }
+.pill { font-size:10px; line-height:14px; padding:2px 6px; border-radius:99px;
+        border:1px solid var(--line); background:var(--card); color:var(--muted); display:inline-block; }
+.pill.on { border-color:var(--pink); color:var(--pink); background:var(--pink-quiet, rgba(232,72,154,.10)); }
+.meta, .hint { color:var(--muted); font-size:12px; }
+.sep { height:1px; background:var(--line); margin:14px 0; border:0; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media (max-width:620px) { .grid2 { grid-template-columns:1fr; } }
+.field { display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--muted); }
+.field input, .field select, .field textarea, .input {
+  font:inherit; font-size:13px; padding:9px 12px; color:var(--text);
+  background:var(--card); border:1px solid var(--line); border-radius:12px; }
+.check { display:flex; align-items:center; gap:6px; font-size:13px; }
+.chip, .badge { font-size:10px; line-height:14px; padding:2px 6px; border-radius:99px;
+                border:1px solid var(--line); background:var(--card); color:var(--muted); }
+.chip.on { border-color:var(--pink); color:var(--pink); background:var(--pink-quiet, rgba(232,72,154,.10)); }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.pane { display:block; }
+.pane[hidden] { display:none; }
+.grow { flex:1 1 auto; min-width:0; }
+.sheet { background:var(--card); border:1px solid var(--line); border-radius:18px;
+         box-shadow:0 10px 30px rgba(44,39,56,.18); }
+.sheet-head { padding:12px 16px; font-size:15px; font-weight:650; border-bottom:1px solid var(--line); }
+.sheet-body { padding:12px 16px; }

@@ -83,6 +83,7 @@ try:
         POSE_NEGATIVE,
         SELFIE_DIRECTIVE,
         NO_PROP_CLAUSE,
+    no_prop_clause,
         REF_ONLY_CLAUSE,
         pose_clause,
         selfie_directive,
@@ -100,6 +101,7 @@ except Exception:  # pragma: no cover - 直接以脚本方式加载时
         POSE_NEGATIVE,
         SELFIE_DIRECTIVE,
         NO_PROP_CLAUSE,
+    no_prop_clause,
         REF_ONLY_CLAUSE,
         pose_clause,
         selfie_directive,
@@ -460,7 +462,7 @@ def build_prompt(appearance: str, prompt: str, context_lines=None, look: str = "
     if context_lines:
         tail = "；".join([str(x).strip() for x in context_lines if str(x).strip()][-6:])
         if tail:
-            parts.append("画面要接得上这段对话：%s" % tail)
+            parts.append("画面只接这段对话的气氛和情绪，不要把对话里提到的物品画进画面：%s" % tail)
     # 脸 / 环境 / 姿势：这三条决定「一眼看出是不是同一个场景里的同一个人」
     if str(face or "").strip():
         parts.append(str(face).strip())
@@ -469,10 +471,13 @@ def build_prompt(appearance: str, prompt: str, context_lines=None, look: str = "
     if str(pose or "").strip():
         parts.append(str(pose).strip())
     if no_prop:
-        parts.append(NO_PROP_CLAUSE)
+        try:
+            parts.append(no_prop_clause(bool(selfie)))
+        except Exception:
+            parts.append(NO_PROP_CLAUSE)
     if str(appearance or "").strip() or str(look or "").strip():
-        parts.append("同一个人，脸、发型、服装保持一致，不要换成别的装扮")
-    parts.append("手机随手拍的原片，画面里不要出现任何文字、日期、时间戳、地点名、水印、logo、相机型号")
+        parts.append("同一个人，脸、发型、服装与母图保持一致")
+    parts.append("手机随手拍的原片质感，画面干净利落，只有人和景物本身")
     return "，".join(parts)
 
 

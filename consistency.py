@@ -24,6 +24,26 @@ import hashlib
 #: 常见地点 → 固定环境。写具体物件而不是形容词，模型才画得出来。
 #: 同一地点永远命中同一条，才谈得上「环境一致」。
 SCENE_MAP: list[tuple[tuple[str, ...], str]] = [
+    # 2026-11-26：地点里写着贵安机房/园区工地，却被 zone=office 画成写字楼。
+    # 这三条必须排在「公司/办公室」前面。
+    (
+        ("机房", "机柜", "数据中心", "服务器房"),
+        "机房：两排黑色机柜贴墙立着，指示灯成排地闪，头顶是走线槽和排风管，"
+        "冷风从地板缝里往上冒，地面是防静电地板",
+    ),
+    (
+        ("工地", "施工", "塔吊", "脚手架"),
+        "园区工地：围挡后面是一片空地，堆着砂石和钢筋，地上有车辙，远处塔吊缓缓转动，"
+        "天空开阔",
+    ),
+    (
+        ("园区", "厂区"),
+        "园区：柏油路两侧是绿化带，远处几栋玻璃幕墙的楼，路口立着指示牌，风把树叶吹得直响",
+    ),
+    (
+        ("外部", "现场", "户外", "露天"),
+        "户外：柏油场地和脚手架围着的一片空地，远处是低矮的厂房，天空开阔，白天的自然光",
+    ),
     (
         ("公司", "办公室", "写字楼", "工位", "上班"),
         "现代写字楼办公室，玻璃幕墙，浅灰色地毯，白色工位隔断，"
@@ -131,8 +151,8 @@ REF_ONLY_CLAUSE = (
 #: 自拍姿势：必须拿着手机，但手机不能入镜（前置摄像头的物理事实）。
 #: 全部写成正向句（GPT 图像系列不吃负面词）。
 SELFIE_POSE = (
-    "自拍：她一只手拿着手机在拍，手机本身不入镜（前置摄像头看不到手机）；"
-    "另一只手空着，自然垂在身侧或轻放在身前，手里什么都没有。"
+    "自拍：她一只手举着手机对着自己拍（前置摄像头，手机在画面外）；"
+    "另一只手自然垂在身侧，手指放松微屈，或轻放在身前。"
 )
 
 #: 只有提示词明确写了在喝/吃，才让她手里拿东西。
@@ -142,15 +162,29 @@ SELFIE_POSE_WITH_PROP = (
 )
 
 #: 提示词没写吃喝时用的正向道具句（以前是负面词，模型根本不听）。
-NO_PROP_CLAUSE = (
-    "两只手都空着：一只手拿手机自己拍，另一只手自然垂在身侧；"
-    "画面里只有她本人和眼前的环境"
-)
+#: 2026-11-24（用户口径）：**自拍本来就是举着手机拍的**，手机在镜头外、拍不到；
+#: 另一只手不拿别的道具即可。以前这里写成「双手空着/不拿手机」，和 SELFIE_POSE
+#: 自相矛盾，模型就画成「握持姿势但手上没东西」——虚空打伞就是这么来的。
+def no_prop_clause(selfie: bool = True) -> str:
+    if selfie:
+        return (
+            "一只手在画面外举着手机自拍，另一只手就做姿态里说的那一个动作（按裙摆、托腮、别头发、撑膝盖）；"
+            "画面上只出现她本人和她所在的那个地方，环境干净利落"
+        )
+    return (
+        "拍摄者在镜头后方、站在画面外；画面里只有她本人；"
+        "她双手自然垂在身侧或轻放在身前，手指放松；"
+        "眼前只有环境本身的景物，画面干净利落"
+    )
+
+
+#: 兼容老代码/测试：默认按自拍处理。
+NO_PROP_CLAUSE = no_prop_clause(True)
 
 #: 他拍姿势：手机在别人手里，画面里不该出现拍摄者。
 OTHER_POSE = (
-    "他拍姿势：拍摄者在镜头后方，画面里不出现拍摄者，也不出现手机；"
-    "被拍的人自然地做自己的事，姿态放松，不要看镜头以外的奇怪角度"
+    "他拍姿势：拍摄者在镜头后方、站在画面外；画面里只有她本人；"
+    "她自然地做自己的事，姿态放松，视线自然落在眼前的景物上"
 )
 
 #: 不许出现的姿势/物件（配合各后端的负面词使用）。
@@ -199,21 +233,34 @@ ZONE_SCENES: dict[str, str] = {
 }
 
 
+#: 地点里出现这些词，说明人不在写字楼里 —— 地点要压过 zone。
+#: 2026-11-26 用户口径：「前一秒还在贵安，后一秒就回办公室了？时间逻辑呢！」
+PLACE_STRONG = (
+    "机房", "机柜", "数据中心", "工地", "园区", "厂区", "现场", "户外", "外部",
+    "山", "海", "湖", "沙滩", "景区", "古镇", "老街", "街", "路上", "地铁", "车站",
+    "机场", "商场", "市场", "菜场", "医院", "病房", "学校", "操场", "公园", "田",
+)
+
+
 def match_scene(place: str, zone: str = "") -> str:
     """地点 → 固定环境描述。命中不了就按地点字符串稳定地选一条兜底。
 
-    ``zone`` 来自日程（hotel/scenic/home…）：有就优先用，景点名字太随性，
-    只按关键词猜会把户外玩的地方画成室内。
+    顺序：地点里有明确的「不在写字楼」线索 → 按地点；否则 zone → 再按地点 → 兜底。
+    ``zone`` 只在她待在室内、地点又没给线索时才算数。
     """
+    text = str(place or "").strip()
     key = str(zone or "").strip().lower()
+    strong = bool(text) and any(word in text for word in PLACE_STRONG)
+    if key in ZONE_SCENES and not strong:
+        return ZONE_SCENES[key]
+    if text:
+        for words, scene in SCENE_MAP:
+            if any(word in text for word in words):
+                return scene
     if key in ZONE_SCENES:
         return ZONE_SCENES[key]
-    text = str(place or "").strip()
     if not text:
         return ""
-    for words, scene in SCENE_MAP:
-        if any(word in text for word in words):
-            return scene
     index = int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:8], 16)
     return FALLBACK_SCENES[index % len(FALLBACK_SCENES)]
 
@@ -225,6 +272,33 @@ NEUTRAL_SCENE = (
 )
 
 
+
+#: 办公场景不写死：按地点换（总裁办公室 / 开放工位 / 会议室 / 前台 / 机房走廊 / 园区露台）
+OFFICE_VARIANTS = (
+    "总裁办公室：整面落地窗，深色胡桃木长桌，桌上摊着几份文件和一台笔记本，墙上一块深蓝企业招牌，窗外是城市楼群",
+    "开放办公区：一排排白色工位，屏幕亮着，隔断上贴着便签，远处玻璃会议室里有人在开会",
+    "会议室：长条会议桌，墙上投着数据屏，桌上散着资料和水杯，椅背上搭着外套",
+    "总部前台：石材台面，背后是集团 logo 墙，旁边有人进出、刷卡",
+    "机房走廊：两侧是机柜，指示灯成排闪，冷风从地板缝里往上冒",
+    "园区露台：玻璃护栏，底下是草坪和停着的车，有人拎着咖啡经过",
+)
+
+
+def crowd_clause(place: str = "", zone: str = "") -> str:
+    """画面里得有别人——她一个人在公司/街上拍照，是最假的。"""
+    z = str(zone or "").strip().lower()
+    t = str(place or "")
+    if z in ("office", "work") or any(w in t for w in ("公司", "集团", "办公", "会议", "机房")):
+        return "这一间只有她自己，办公室的门关着，画面里没有别人"
+    if z in ("restaurant",) or any(w in t for w in ("餐厅", "饭店", "食堂", "咖啡")):
+        return "旁边几桌有人在吃饭聊天，服务员端着盘子在走，画面里不止她一个人"
+    if z in ("mall", "street", "road", "scenic") or any(w in t for w in ("街", "商场", "路", "景区", "逛")):
+        return "周围有路人，前后都有人在走动，画面里不止她一个人"
+    if z in ("home", "sleep"):
+        return "家里只有她自己，安安静静的，画面里没有别人"
+    return "画面里不止她一个人，远处有旁人在活动"
+
+
 def scene_anchor(place: str, fallback_scene: str = "", zone: str = "") -> str:
     """给提示词用的环境块，**永远不为空**。
 
@@ -232,21 +306,45 @@ def scene_anchor(place: str, fallback_scene: str = "", zone: str = "") -> str:
     以前的顺序反了：先按地点重算，结果 Amo 明确给的「户外/酒店」被丢掉，
     景点名里没有「景区」两个字就落到随机室内。
     """
-    scene = (str(fallback_scene or "").strip()
-             or match_scene(place, zone=zone)
-             or NEUTRAL_SCENE)
-    return "环境：" + scene + "。" + ENV_LOCK
+    _t = str(place or "")
+    _z = str(zone or "").strip().lower()
+    _given = str(fallback_scene or "").strip()
+    _office_like = _z in ("office", "work") or any(
+        w in _t for w in ("公司", "集团", "办公", "会议", "机房", "前台"))
+    if _office_like and not _given:
+        _idx = int(hashlib.sha256((_t or "office").encode("utf-8")).hexdigest()[:8], 16)
+        scene = OFFICE_VARIANTS[_idx % len(OFFICE_VARIANTS)]
+    else:
+        scene = _given or match_scene(place, zone=zone) or NEUTRAL_SCENE
+    return "环境：" + scene + "。" + crowd_clause(_t, _z) + "。" + ENV_LOCK
 
+
+
+#: 自拍身体姿态池（2026-11-26 用户口径）：不能总是同一个姿势；
+#: 每一条都把「举手机的那只手」和「另一只手在干什么」写清楚，两只手都占住，
+#: 模型就没有第三只手去抓杯子/伞/花/袋子。
+SELFIE_BODY_POOL = (
+    "站直、微微侧身对着镜头，重心落在后脚，一只手在画面外举着手机自拍，另一只手按在裙侧的缝线上。",
+    "坐在窗边，一条腿随意搭在另一条上，手机举在画面外，另一只手托着腮，看着镜头。",
+    "背靠墙面站着，肩膀贴着墙，手机举在画面外，另一只手把碎发别到耳后。",
+    "半转过身回头看镜头，头发被带起一点，手机举在画面外，另一只手抬起来碰了碰领巾。",
+    "走路走到一半停下拍，步子还没收，手机举在画面外，另一只手抬到额头前挡了一下阳光。",
+    "蹲在路边拍，膝盖并在一起，手机举在画面外，另一只手撑在膝盖上。",
+    "趴在床上举着手机拍，下巴搁在枕头上，另一只手的手指卷着发梢。",
+    "站着把手机举高一点俯拍，微微仰头，另一只手垂在身侧、手指放松。",
+    "坐在台阶上拍，手肘搭在膝盖上，另一只手撑着下巴，眼睛看向镜头。",
+    "侧身站着，一只手举着手机（画面外），另一只手抱在胸前，下巴微微抬着。",
+)
 
 #: 头部/身体朝向池：每次出图按种子换一条。不是固定姿势，是「别每次都歪着」。
 #: 2026-11-23 用户口径：照片不能只有一个姿势，但也不能钉死成一个。
 HEAD_POSE_POOL = (
-    "头部端正，脸正对镜头，双肩水平",
-    "头抬起一点点，下巴线条清楚，视线平视镜头",
-    "身体侧过去一点，肩膀带角度，头转回来正对镜头",
-    "站直，视线平视前方，双手自然放松",
-    "头稍微偏一点点（幅度很小），眼睛看向镜头",
-    "微微低头，抬眼看向镜头",
+    "站直，脸正对镜头，双肩水平，下巴微收",
+    "身体侧过去四十五度，头转回来正对镜头",
+    "微微仰起一点下巴，视线平视镜头",
+    "肩膀一高一低，头顺着肩膀方向轻轻侧，但脸仍朝镜头",
+    "略低一点机位，她抬眼看向镜头，头上的空间留白",
+    "背对镜头半回头，露出侧脸和一只眼睛",
 )
 
 
@@ -256,8 +354,11 @@ def head_pose(seed: str = "") -> str:
 
 
 def selfie_pose(seed: str = "", with_prop: bool = False) -> str:
-    """自拍姿势：一只手拿手机 + 一条正向的头部朝向 + 参考图只定长相。"""
-    base = SELFIE_POSE_WITH_PROP if with_prop else SELFIE_POSE
+    """自拍姿势：换着来的身体姿态 + 头部朝向 + 参考图只定长相。"""
+    if with_prop:
+        base = SELFIE_POSE_WITH_PROP
+    else:
+        base = "自拍：" + _pick(SELFIE_BODY_POOL, seed)
     return base + "头部朝向：" + head_pose(seed) + "。" + REF_ONLY_CLAUSE + "。"
 
 
