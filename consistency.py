@@ -256,6 +256,10 @@ def match_scene(place: str, zone: str = "") -> str:
     # 所以「车内」优先于 zone=road 的街道取景。
     if any(w in text for w in ("车上", "车内", "后排", "坐车", "车厢")):
         return ZONE_SCENES.get("car", "")
+    # 2026-11-26（用户口径）：她的「路上」= 坐车（老周开），不是走街上；
+    # 地铁/公交/站台/走路 才按街道或车站取景。
+    if key == "road" and not any(w in text for w in ("地铁", "公交", "站台", "候车", "人行道", "步行", "走路")):
+        return ZONE_SCENES.get("car", "")
     strong = bool(text) and any(word in text for word in PLACE_STRONG)
     if key in ZONE_SCENES and not strong:
         return ZONE_SCENES[key]

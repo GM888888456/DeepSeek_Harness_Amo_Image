@@ -1870,6 +1870,12 @@ class AmoImagePlugin(Star):
         explicit = str(place or "").strip()
         place = explicit or self._scene_place()
         zone_key = str(zone or "").strip() or self._scene_zone()
+        # 2026-11-26（用户口径）：日程「在路上」= 她坐 A8 后排（老周开），照片就该在车里；
+        # 地铁/公交/走路除外。车上不拿吃喝。
+        _by_car = (str(zone_key or "").lower() == "road") and not any(
+            w in str(place or "") for w in ("地铁", "站台", "公交", "人行道", "走"))
+        if _by_car and "车上" not in str(place or ""):
+            place = "车上（后排）" + (" " + str(place or "") if str(place or "") else "")
         scene = self._remember_scene(place, strict=bool(explicit), zone=zone_key)
         # 日程/Amo 给了地点时，它就是唯一真相：activity 里顺口一句「公司」，
         # 不能把在家的画面改成办公室（2026-11-21 她在家拍出公司）。
@@ -1887,6 +1893,8 @@ class AmoImagePlugin(Star):
         # selfie 是 Amo 的明确判定；没给才由我们按提示词推
         selfie_flag = self._is_selfie(prompt, forced=selfie)
         with_prop = self._has_food_prop(prompt)
+        if _by_car:
+            with_prop = False   # 在车上不吃不喝，手里也不拿杯子
         # 穿日程那套时，把发型单独带上（_daily_look 里已经带过，避免重复）
         look = scheduled or ("" if self._companion() is not None else self._daily_look())
         hairstyle = (str(self._cfg("character_hairstyle", "") or "").strip()
