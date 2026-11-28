@@ -1,4 +1,36 @@
-# 我想永远陪着你 · 相片（Astrbot_Amo_Image）
+# 我想永远陪着你 · Relationship（关系模块）
+
+> 当前开发分支：`amo-refactor-20261128`
+
+本仓库已从原影音仓库改名为 Relationship。当前阶段先建立独立的关系数据域与 WebUI，原影音代码暂时保留作迁移过渡，**尚未从 Terminal 完成影像/语音迁移**。
+
+## 模块边界
+
+- **Relationship 拥有**：人物/组织身份、别名、关系边、关系状态、熟悉度、信任度、互动历史、社会事件。
+- **Terminal 拥有**：当前对话对象、事件识别、日程、意图判断、行动编排、调用关系模块的适配层。
+- **Market / Finance / Medical**：只保存各自业务实体，通过稳定的 person_id / organization_id 关联主体，不自行维护第二套社会关系。
+- 关系模块不得反向调用 Terminal，也不得接管日程或聊天主链。
+
+## 当前新增接口
+
+- `relationship/snapshot`
+- `relationship/people`
+- `relationship/person/save`
+- `relationship/edges`
+- `relationship/edge/save`
+- `relationship/interactions`
+
+关系数据存于独立的 `relationship.db`，不与 Terminal 的日程/画像数据库混用。旧关系网迁移应通过 UID 保持原 person_id，且只迁移关系网边；用户对 Amo 本人的亲密阶段/好感度仍留在 Terminal。
+
+## WebUI
+
+`views/dashboard/index.html` 使用与 Terminal 相同的 `terminal-base.css`、`compat.css`、`tweak.css`，并沿用顶部细线页签、浅/深色主题和窄屏布局。
+
+## 迁移注意
+
+目前为兼容过渡阶段：原影音实现仍在代码历史与插件主体中，不能把本仓库视为已完成“影音归 Terminal”。在 Terminal 的影像/语音入口、适配与回归测试完成前，不应删除原影音运行链。
+
+---
 
 ## 1.1.0
 
