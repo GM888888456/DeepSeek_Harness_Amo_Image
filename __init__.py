@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
-"""我想永远陪着你-相片（生图联动）插件。"""
+"""我想永远陪着你-关系（Relationship）插件。"""
 
-try:  # 正常包内加载
-    from .main import AmoImagePlugin, PLUGIN_NAME, PLUGIN_VERSION
-except Exception:  # 单测/CI 按文件加载时没有包上下文，退回绝对导入
-    from main import AmoImagePlugin, PLUGIN_NAME, PLUGIN_VERSION
+try:
+    from .main import AmoRelationshipPlugin, PLUGIN_NAME, PLUGIN_VERSION
+except Exception:
+    from main import AmoRelationshipPlugin, PLUGIN_NAME, PLUGIN_VERSION
 
-__all__ = ["AmoImagePlugin", "PLUGIN_NAME", "PLUGIN_VERSION"]
+# 旧模块名兼容一个升级周期；新 metadata 只加载 AmoRelationshipPlugin。
+AmoImagePlugin = AmoRelationshipPlugin
+
+__all__ = ["AmoRelationshipPlugin", "AmoImagePlugin", "PLUGIN_NAME", "PLUGIN_VERSION"]
