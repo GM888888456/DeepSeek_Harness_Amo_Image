@@ -1,212 +1,47 @@
 <!doctype html>
 <html lang="zh-CN" data-theme="light">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#f4f4f6" />
-  <title>相册与语音 · 观山湖</title>
-  <link rel="stylesheet" href="./terminal-base.css?v=6" />
-  <link rel="stylesheet" href="./compat.css?v=4" />
-
-  <link rel="stylesheet" href="./tweak.css?v=4" />
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f4f6"><title>我想永远陪着你-关系</title>
+<link rel="stylesheet" href="./terminal-base.css?v=6"><link rel="stylesheet" href="./compat.css?v=5"><link rel="stylesheet" href="./tweak.css?v=5">
+<style>
+.relation-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px;margin-top:10px}
+.relation-form .wide{grid-column:1/-1}.relation-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line)}
+.relation-row:last-child{border-bottom:0}.relation-name{font-size:13px;font-weight:600}.relation-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.relation-actions{display:flex;gap:7px;align-items:center}.metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.metric{border-right:1px solid var(--line);padding:4px 9px}.metric:last-child{border:0}.metric strong{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.metric span{font-size:11px;color:var(--muted)}.pill{white-space:nowrap}
+@media(max-width:460px){.relation-form{grid-template-columns:1fr}.relation-form .wide{grid-column:auto}.relation-row{align-items:flex-start}}
+</style>
 </head>
-<body>
-  <div class="wrap">
-    <header>
-      <div class="brand"><span class="dot"></span><span>相册与语音 · 观山湖</span></div>
-      <span class="clock" id="clock">—</span>
-      <button class="icon-btn" id="theme" title="切换深浅色">◐</button>
-    </header>
-
-
-    <nav class="tabs">
-      <button class="tab on" data-tab="status">概览</button>
-      <button class="tab" data-tab="wardrobe">服装</button>
-      <button class="tab" data-tab="voice">语音</button>
-      <button class="tab" data-tab="history">记录</button>
-    </nav>
-
-    <section class="pane" id="pane-status">
-      <div class="card">
-        <div class="card-title">
-          <span>后端</span>
-          <span class="pill" id="enablePill">…</span>
-        </div>
-        <dl class="kv">
-          <dt>类型</dt><dd id="providerName">—</dd>
-          <dt>地址</dt><dd id="apiBase">—</dd>
-          <dt>模型</dt><dd id="modelName">—</dd>
-          <dt>尺寸</dt><dd id="sizeText">—</dd>
-          <dt>密钥</dt><dd id="keyMasked">—</dd>
-          <dt>今日</dt><dd id="usedToday">—</dd>
-          <dt>累计</dt><dd id="callsTotal">—</dd>
-        </dl>
-        <div class="meta" id="statusMeta">加载中…</div>
-      </div>
-    </section>
-
-    <section class="pane" id="pane-config" hidden>
-      <div class="card">
-        <div class="card-title"><span>开关</span><span class="hint">文字、数字、密钥这类填写项在 AstrBot「插件设置」里改</span></div>
-        <label class="check"><input type="checkbox" id="enable" /> 启用生图</label>
-        <label class="check"><input type="checkbox" id="mount_only" /> 只当执行者（听 Amo 的）</label>
-        <label class="check"><input type="checkbox" id="use_memory_context" /> 接记忆上下文</label>
-        <label class="check"><input type="checkbox" id="allow_private" /> 私聊可用</label>
-        <label class="check"><input type="checkbox" id="allow_group" /> 群聊可用</label>
-        <label class="check"><input type="checkbox" id="require_at_in_group" /> 群里必须真 @</label>
-        <label class="check"><input type="checkbox" id="quote_in_group" /> 群里引用原消息</label>
-        <label class="check"><input type="checkbox" id="safe_mode" /> 内容边界</label>
-        <label class="check"><input type="checkbox" id="lock_scene_to_schedule" /> 场景 / 活动锁定日程</label>
-      </div>
-
-      <div class="card" hidden>
-        <div class="card-title"><span>后端</span><span class="hint" id="presetHint">选预设会填地址和模型</span></div>
-        <div class="field">
-          <label>预设</label>
-          <select id="preset"><option value="">手动填写</option></select>
-        </div>
-        <div class="field">
-          <label>类型</label>
-          <select id="provider">
-            <option value="openai">openai（/images/generations）</option>
-            <option value="openai_chat">openai_chat（/chat/completions）</option>
-            <option value="gemini">gemini（原生 generateContent）</option>
-            <option value="custom">custom（自定义端点）</option>
-          </select>
-        </div>
-        <div class="field"><label>api_base</label><input id="api_base" spellcheck="false" placeholder="https://api.openai.com/v1" /></div>
-        <div class="field"><label>api_key</label><input id="api_key" type="password" spellcheck="false" placeholder="留空 = 不修改" /></div>
-        <div class="field">
-          <label>model（拉取后选择）</label>
-          <div class="row">
-            <select id="model" class="grow"></select>
-            <button class="link" id="fetchModels" type="button">拉取</button>
-          </div>
-          <div class="meta" id="modelHint">切到配置页会自动拉取</div>
-          <input id="modelManual" hidden spellcheck="false" placeholder="后端没返回图片模型时，在这里手填一次" />
-        </div>
-        <div class="grid2">
-          <div class="field"><label>size</label><input id="size" spellcheck="false" placeholder="1024x1024" /></div>
-          <div class="field"><label>aspect_ratio</label><input id="aspect_ratio" spellcheck="false" placeholder="留空自动" /></div>
-          <div class="field"><label>n</label><input id="n" type="number" min="1" /></div>
-          <div class="field"><label>quality</label><input id="quality" spellcheck="false" placeholder="留空不发" /></div>
-        </div>
-        <div class="field"><label>负面提示词</label><textarea id="negative_prompt" rows="2" spellcheck="false"></textarea></div>
-        <label class="check"><input type="checkbox" id="chat_modalities" /> Chat 通道要求图片模态（modalities）</label>
-
-        <div id="customBlock" hidden>
-          <div class="field"><label>custom_url（完整地址）</label><input id="custom_url" spellcheck="false" /></div>
-          <div class="field"><label>custom_body（JSON 模板）</label><textarea id="custom_body" rows="3" spellcheck="false"></textarea></div>
-          <div class="field"><label>custom_response_path</label><input id="custom_response_path" spellcheck="false" placeholder="data.images[0].url" /></div>
-        </div>
-      <div class="sep"></div>
-        <div class="card-title">
-          <span>人设一致性</span>
-          <button class="link" id="extractPersona">从人格提取</button>
-        </div>
-        <div class="meta" id="personaHint">读陪伴的人格设定，自动填外观、性别和角色名</div>
-        <div class="field"><label>外观（脸、眼睛、体型）</label><textarea id="character_appearance" rows="2"></textarea></div>
-        <div class="grid2">
-          <div class="field"><label>性别</label>
-            <select id="character_gender">
-              <option value="自动">自动</option>
-              <option value="女">女</option>
-              <option value="男">男</option>
-            </select>
-          </div>
-          <div class="field"><label>角色名 / 一句话人设</label><input id="character_persona" placeholder="留空用陪伴的人格名" /></div>
-          <div class="field"><label>拍摄角度</label>
-            <select id="camera_mode">
-              <option value="自动">自动</option>
-              <option value="自拍">自拍</option>
-              <option value="他拍">他拍</option>
-            </select>
-          </div>
-          <div class="field"><label>发型（固定）</label><input id="character_hairstyle" /></div>
-          <div class="field"><label>换装冷却（分钟）</label><input id="outfit_change_cooldown_minutes" type="number" min="0" /></div>
-        </div>
-        <div class="field"><label>服装池（每行一套）</label><textarea id="character_outfits" rows="3"></textarea></div>
-      <div class="sep"></div>
-        <div class="card-title"><span>使用限制</span></div>
-        <div class="grid2">
-          <div class="field"><label>冷却（秒）</label><input id="cooldown_seconds" type="number" min="0" /></div>
-          <div class="field"><label>私聊每日</label><input id="private_daily_limit" type="number" min="0" /></div>
-          <div class="field"><label>批量上限（张）</label><input id="batch_max" type="number" min="1" /></div>
-          <div class="field"><label>群聊每日 / 群</label><input id="group_daily_limit" type="number" min="0" /></div>
-          <div class="field"><label>发图前缀</label><input id="reply_prefix" /></div>
-        </div>
-        <div class="field"><label>被拦时的回复</label><input id="blocked_reply" /></div>
-      </div>
-
-      <div class="row">
-        <button class="btn" id="save">保存配置</button>
-        <span class="hint" id="saveHint">保存后立即生效</span>
-      </div>
-    </section>
-
-
-    <section class="pane" id="pane-voice" hidden>
-      <div class="card">
-        <div class="card-title"><span>语音（影音内置）</span><span class="pill" id="vPill">…</span></div>
-        <dl class="kv">
-          <dt>后端</dt><dd id="vProvider">—</dd>
-          <dt>音色数</dt><dd id="vCount">—</dd>
-          <dt>今日已用</dt><dd id="vUsed">—</dd>
-          <dt>默认音色</dt><dd id="vDefault">—</dd>
-        </dl>
-        <div class="row" style="margin-top:8px">
-          <button class="btn" id="vRefresh" type="button">刷新</button>
-          <button class="btn" id="vPull" type="button">拉取音色</button>
-        </div>
-        <div class="meta" id="vHint">—</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>音色库</span></div>
-        <ul class="list" id="vList"><li class="empty">加载中…</li></ul>
-      </div>
-    </section>
-    <section class="pane" id="pane-wardrobe" hidden>
-      <div class="card">
-        <div class="card-title">
-          <span>她今天穿</span>
-          <span class="pill" id="wearNow">—</span>
-        </div>
-        <div class="meta" id="wardrobeMeta">读命中…</div>
-      <div class="sep"></div>
-        <div class="card-title">
-          <span>服装库</span>
-          <button class="link" id="wRefresh">刷新</button>
-        </div>
-        <ul class="list" id="wList">
-          <li class="empty">衣柜空的——衣服从市场买，她会自己挑</li>
-        </ul>
-      </div>
-    </section>
-
-    <section class="pane" id="pane-history" hidden>
-      <div class="card">
-        <div class="card-title">
-          <span>最近画的</span>
-          <button class="link" id="refresh">刷新</button>
-        </div>
-        <ul class="list" id="history">
-          <li class="empty">还没有记录</li>
-        </ul>
-      </div>
-    </section>
-
-  </div>
-  <script type="module" src="./app.js?v=1.9.0"></script>
-<script>
-  (function () {
-    var t = document.getElementById("clock");
-    if (!t) return;
-    function tick() {
-      var d = new Date();
-      t.textContent = ("0"+d.getHours()).slice(-2) + ":" + ("0"+d.getMinutes()).slice(-2);
-    }
-    tick(); setInterval(tick, 20000);
-  })();
-</script>
-</body>
-</html>
+<body><div class="wrap">
+<header><div class="brand"><span class="dot"></span><span>关系网络</span></div><span class="clock" id="clock">Amo · Relationship</span><button class="icon-btn" id="theme" title="切换深浅色">◐</button></header>
+<nav class="tabs">
+<button class="tab on" data-tab="people">人物</button><button class="tab" data-tab="relations">关系</button><button class="tab" data-tab="history">互动</button>
+</nav>
+<section class="pane" id="pane-people">
+<div class="card"><div class="card-title"><span>关系总览</span><span class="pill" id="connection">连接中</span></div>
+<div class="metric-row"><div class="metric"><strong id="countPeople">—</strong><span>人物</span></div><div class="metric"><strong id="countRelations">—</strong><span>关系</span></div><div class="metric"><strong id="countInteractions">—</strong><span>互动</span></div></div></div>
+<div class="card"><div class="card-title"><span>新增人物 / 组织</span><span class="hint">身份由关系模块统一维护</span></div>
+<div class="relation-form"><label class="block">名称<input class="input" id="personName" placeholder="姓名或组织名称"></label>
+<label class="block">主体类型<select class="input" id="entityType"><option value="person">个人</option><option value="organization">组织</option></select></label>
+<label class="block wide">别名（逗号分隔）<input class="input" id="aliases" placeholder="常用称呼、简称"></label>
+<div class="wide"><button class="btn" id="addPerson">保存人物</button></div></div></div>
+<div class="card"><div class="card-title"><span>人物档案</span><input class="input" id="search" style="max-width:55%" placeholder="搜索姓名 / 别名"></div><div id="peopleList"><div class="empty">正在读取…</div></div></div>
+</section>
+<section class="pane" id="pane-relations" hidden>
+<div class="card"><div class="card-title"><span>建立关系</span><span class="hint">关系是有方向的主体 → 客体</span></div>
+<div class="relation-form"><label class="block">主体<select class="input" id="subject"></select></label>
+<label class="block">关系类型<select class="input" id="relationType"><option value="family">家人</option><option value="friend">朋友</option><option value="colleague">同事</option><option value="customer">客户</option><option value="supplier">供应商</option><option value="doctor">医生</option><option value="bank_manager">银行经理</option><option value="partner">合作伙伴</option><option value="acquaintance">熟人</option><option value="lover">恋人</option></select></label>
+<label class="block wide">客体<select class="input" id="object"></select></label>
+<label class="block">熟悉度（0–100）<input class="input" id="familiarity" type="number" min="0" max="100" value="0"></label>
+<label class="block">信任度（0–100）<input class="input" id="trust" type="number" min="0" max="100" value="0"></label>
+<label class="block wide">备注<input class="input" id="relationNote" placeholder="关系来源、背景或边界"></label>
+<div class="wide"><button class="btn" id="saveRelation">保存关系</button></div></div></div>
+<div class="card"><div class="card-title"><span>关系网络</span><button class="link" id="refreshRelations">刷新</button></div><div id="relationList"><div class="empty">暂无关系</div></div></div>
+</section>
+<section class="pane" id="pane-history" hidden><div class="card"><div class="card-title"><span id="historyTitle">互动历史</span></div><div id="interactionList"><div class="empty">从人物列表选择一个人</div></div></div></section>
+<footer>Relationship 管理身份与社会关系；Terminal 负责事件、日程和行动协调。</footer>
+</div><script type="module" src="./app.js?v=1.0.0"></script>
+<script>(function(){const e=document.getElementById("clock");function t(){e.textContent=new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}t();setInterval(t,20000)})();</script>
+</body></html>
