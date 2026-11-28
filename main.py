@@ -14,6 +14,12 @@
 
 from __future__ import annotations
 
+try:
+    from .relationship_store import RelationshipStore
+except Exception:
+    from relationship_store import RelationshipStore  # type: ignore
+
+
 import asyncio
 import base64
 import json
@@ -625,6 +631,16 @@ class AmoImagePlugin(Star):
         self._calls_total = 0
         self._started_at = time.time()
         self.plugin_dir = os.path.dirname(os.path.abspath(__file__))
+        try:
+            from astrbot.core.utils.astrbot_path import get_astrbot_data_path
+            _relationship_dir = os.path.join(get_astrbot_data_path(), "plugin_data", "DeepSeek_Harness_Amo_Relationship")
+        except Exception:
+            _relationship_dir = os.path.join(self.plugin_dir, "data", "relationship")
+        try:
+            self.relationship_store = RelationshipStore(_relationship_dir)
+        except Exception as exc:
+            self.relationship_store = None
+            logger.error("[relationship] 数据层初始化失败: %s" % exc)
         self._cfg_sync_at = 0.0          # 配置热同步的节流时间戳
         self._register_web_apis()
 
@@ -2375,6 +2391,77 @@ class AmoImagePlugin(Star):
     async def api_photo_clear(self):
         return self.photo_clear()
 
+    # ---------- Relationship domain API ----------
+
+    async def api_relationship_snapshot(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        return {"code": 0, "data": store.snapshot()}
+
+    async def api_relationship_people(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        query = ""
+        try:
+            query = str((await self._read_body()).get("q") or "")
+        except Exception:
+            pass
+        return {"code": 0, "data": {"items": store.find_people(query, 100)}}
+
+    async def api_relationship_person_save(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        body = await self._read_body()
+        try:
+            item = store.upsert_person(
+                body.get("display_name") or body.get("name"),
+                person_id=body.get("person_id") or None,
+                aliases=body.get("aliases") or [],
+                entity_type=body.get("entity_type") or "person",
+                attributes=body.get("attributes") or {},
+            )
+            return {"code": 0, "data": item}
+        except Exception as exc:
+            return {"code": 1, "msg": str(exc)}
+
+    async def api_relationship_edges(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        body = await self._read_body()
+        return {"code": 0, "data": {"items": store.list_relationships(
+            body.get("person_id") or None, include_inactive=bool(body.get("include_inactive"))
+        )}}
+
+    async def api_relationship_edge_save(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        body = await self._read_body()
+        try:
+            rows = store.set_relationship(
+                body.get("subject_id"), body.get("object_id"), body.get("relation_type"),
+                familiarity=body.get("familiarity"), trust=body.get("trust"),
+                confidence=body.get("confidence", 1.0), source=body.get("source", "manual"),
+                note=body.get("note", ""), status=body.get("status", "active"),
+            )
+            return {"code": 0, "data": {"items": rows}}
+        except Exception as exc:
+            return {"code": 1, "msg": str(exc)}
+
+    async def api_relationship_interactions(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        body = await self._read_body()
+        pid = str(body.get("person_id") or "")
+        if not pid:
+            return {"code": 1, "msg": "缺少 person_id"}
+        return {"code": 0, "data": {"items": store.list_interactions(pid, body.get("limit", 50))}}
+
     # ---------- 面板 Web API ----------
 
     def _register_web_apis(self):
@@ -2397,6 +2484,12 @@ class AmoImagePlugin(Star):
             ("/photo/job", self.api_photo_job, ["GET", "POST"]),
             ("/photo/last", self.api_photo_last, ["GET", "POST"]),
             ("/photo/clear", self.api_photo_clear, ["GET", "POST"]),
+            ("/relationship/snapshot", self.api_relationship_snapshot, ["GET"]),
+            ("/relationship/people", self.api_relationship_people, ["GET", "POST"]),
+            ("/relationship/person/save", self.api_relationship_person_save, ["POST"]),
+            ("/relationship/edges", self.api_relationship_edges, ["GET", "POST"]),
+            ("/relationship/edge/save", self.api_relationship_edge_save, ["POST"]),
+            ("/relationship/interactions", self.api_relationship_interactions, ["GET", "POST"]),
         ]
         for path, handler, methods in routes:
             try:
