@@ -41,6 +41,21 @@ class RelationshipStoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.store.set_relationship("A", "B", "friend")
 
+    def test_legacy_import_keeps_uid_identity(self):
+        result = self.store.import_legacy(
+            [{"uid": "1001", "name": "张三", "alias": "老张"}],
+            [{"a_uid": "1001", "b_uid": "1002", "relation": "同事", "note": "旧关系"}],
+        )
+        self.assertEqual(result["people_imported"], 1)
+        self.assertEqual(result["relationships_imported"], 1)
+        self.assertIsNotNone(self.store.get_person("1001"))
+        self.assertIsNotNone(self.store.get_person("1002"))
+        self.assertEqual(self.store.list_relationships("1001")[0]["relation_type"], "同事")
+
+    def test_social_event_requires_known_participants(self):
+        with self.assertRaises(ValueError):
+            self.store.record_social_event("聚餐", participant_ids=["missing"])
+
     def test_snapshot_counts(self):
         self.store.upsert_person("甲", person_id="A")
         self.assertEqual(self.store.snapshot()["counts"]["people"], 1)
