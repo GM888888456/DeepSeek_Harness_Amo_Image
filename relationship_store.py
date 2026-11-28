@@ -267,7 +267,7 @@ class RelationshipStore:
             uid = str(row.get("uid") or "").strip()
             if not uid or uid in ("bot", "self"):
                 continue
-            name = str(row.get("alias") or row.get("name") or uid)
+            name = str(row.get("alias") or row.get("name") or "").strip() or uid
             self.upsert_person(name, person_id=uid, aliases=[row.get("name"), row.get("alias")],
                                entity_type="person",
                                attributes={"legacy_uid": uid})

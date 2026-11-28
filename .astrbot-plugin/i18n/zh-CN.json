@@ -1,15 +1,15 @@
 {
   "metadata": {
-    "display_name": "DeepSeek Harness Amo Image"
+    "display_name": "DeepSeek Harness Amo Relationship"
   },
   "views": {
     "dashboard": {
-      "title": "我想永远陪着你-影音"
+      "title": "我想永远陪着你-关系"
     }
   },
   "pages": {
     "dashboard": {
-      "title": "我想永远陪着你-影音"
+      "title": "我想永远陪着你-关系"
     }
   }
 }
