@@ -220,6 +220,73 @@ class RelationshipStore:
             ).fetchall()
         return [self._decode(row) for row in rows]
 
+    def record_social_event(self, title, event_type="social", starts_at=None,
+                            ends_at=None, location="", participant_ids=None,
+                            status="planned", metadata=None, event_id=None):
+        name = str(title or "").strip()
+        if not name:
+            raise ValueError("title is required")
+        eid = str(event_id or ("E-" + uuid.uuid4().hex[:16]))
+        now = time.time()
+        participants = [str(x) for x in (participant_ids or []) if str(x)]
+        with self._write() as conn:
+            for pid in participants:
+                if not conn.execute("SELECT 1 FROM people WHERE person_id=?", (pid,)).fetchone():
+                    raise ValueError("unknown participant: " + pid)
+            conn.execute("""
+                INSERT INTO social_events(event_id,title,event_type,starts_at,ends_at,location,
+                    participant_ids,status,metadata,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(event_id) DO UPDATE SET title=excluded.title,
+                    event_type=excluded.event_type, starts_at=excluded.starts_at,
+                    ends_at=excluded.ends_at, location=excluded.location,
+                    participant_ids=excluded.participant_ids, status=excluded.status,
+                    metadata=excluded.metadata, updated_at=excluded.updated_at
+            """, (eid, name, str(event_type or "social"), starts_at, ends_at,
+                  str(location or ""), self._json(participants, []), str(status or "planned"),
+                  self._json(metadata, {}), now, now))
+            row = conn.execute("SELECT * FROM social_events WHERE event_id=?", (eid,)).fetchone()
+        return self._decode(row)
+
+    def list_social_events(self, limit=100):
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM social_events ORDER BY coalesce(starts_at,created_at) DESC LIMIT ?",
+                (max(1, min(int(limit), 500)),)
+            ).fetchall()
+        return [self._decode(row) for row in rows]
+
+    def import_legacy(self, profiles=None, relations=None):
+        """Idempotently import Terminal's old UID graph without importing its private user-affection state."""
+        profile_rows = profiles if isinstance(profiles, list) else []
+        relation_rows = relations if isinstance(relations, list) else []
+        people_count = edge_count = 0
+        for row in profile_rows:
+            if not isinstance(row, dict):
+                continue
+            uid = str(row.get("uid") or "").strip()
+            if not uid or uid in ("bot", "self"):
+                continue
+            name = str(row.get("alias") or row.get("name") or uid)
+            self.upsert_person(name, person_id=uid, aliases=[row.get("name"), row.get("alias")],
+                               entity_type="person",
+                               attributes={"legacy_uid": uid})
+            people_count += 1
+        for row in relation_rows:
+            if not isinstance(row, dict):
+                continue
+            a = str(row.get("a_uid") or "").strip()
+            b = str(row.get("b_uid") or "").strip()
+            if not a or not b or a in ("bot", "self") or b in ("bot", "self"):
+                continue
+            for pid in (a, b):
+                if not self.get_person(pid):
+                    self.upsert_person(pid, person_id=pid, attributes={"legacy_uid": pid})
+            self.set_relationship(a, b, str(row.get("relation") or "朋友"),
+                                  source="terminal_legacy", note=str(row.get("note") or ""))
+            edge_count += 1
+        return {"people_imported": people_count, "relationships_imported": edge_count}
+
     def snapshot(self):
         with self._lock:
             counts = {}
