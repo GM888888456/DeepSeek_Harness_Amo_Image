@@ -1892,7 +1892,14 @@ class AmoImagePlugin(Star):
         activity_text = str(activity or "").strip() or self._scene_activity()
         # selfie 是 Amo 的明确判定；没给才由我们按提示词推
         selfie_flag = self._is_selfie(prompt, forced=selfie)
-        with_prop = self._has_food_prop(prompt)
+        # 2026-11-28（用户：「拍照明明没有提示手拿东西，是不是日程带进去的？」）：
+        # 以前只看 _has_food_prop(prompt)：当拍照时用户没说手拿东西，
+        # 但 prompt 里拼接了 activity（例如「吃着厨房备好的营养早餐」/「吃着鲍鱼燕窝粥」），
+        # 就会命中「吃/早餐/粥」，误将 with_prop 设为 True，生成「一手拿碗/杯」的照片。
+        # 修正：只有当原提示词里明确要求「手拿/端着/喝着/吃着/拿着/端/拿/杯/碗」时才允许带道具；
+        # 日程里的吃喝文案不能作为手拿道具的依据。
+        explicit_prop = any(w in str(prompt or "") for w in ("手里拿", "手拿", "端着", "端", "拿着", "手握", "握着", "拿着杯", "拿着碗", "拿碗", "拿杯"))
+        with_prop = explicit_prop and self._has_food_prop(prompt)
         if _by_car:
             with_prop = False   # 在车上不吃不喝，手里也不拿杯子
         # 穿日程那套时，把发型单独带上（_daily_look 里已经带过，避免重复）
