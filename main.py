@@ -490,110 +490,7 @@ def build_prompt(appearance: str, prompt: str, context_lines=None, look: str = "
 class AmoRelationshipPlugin(Star):
     """生图插件：认人设、接上下文、只画图。"""
 
-    # ------------------------------------------------------------------
-    # 影音：语音（sp/ 里的 SpeechSoundPlugin 作为内嵌实例）
-    # ------------------------------------------------------------------
-    def _speech(self):
-        """惰性起一份语音实例：同一个 Context、读语音自己的配置。"""
-        cached = getattr(self, "_speech_instance", None)
-        if cached is not None:
-            return cached
-        if getattr(self, "_speech_failed", False):
-            return None
-        try:
-            from .sp.sp_main import SpeechSoundPlugin as _Speech
-        except Exception:
-            try:
-                from sp.sp_main import SpeechSoundPlugin as _Speech  # type: ignore
-            except Exception as exc:
-                self._speech_failed = True
-                logger.error("[amo_media] 语音模块导入失败（影音只剩生图）: %s" % exc)
-                return None
-        try:
-            inst = _Speech(self.context, self._speech_config())
-            self._speech_instance = inst
-            self.speech = inst
-            logger.info("[amo_media] 语音已并入影音（内嵌实例，接口前缀 /sp）")
-            return inst
-        except Exception as exc:
-            self._speech_failed = True
-            logger.error("[amo_media] 语音模块启动失败（影音只剩生图）: %s" % exc)
-            return None
-
-    #: 面板（终端「语音」页）写进影音配置的这些键，要盖到语音子插件上，
-    #: 否则出现「面板改了没用、真正生效的是另一份文件」的两套配置。
-    # 注意：cooldown_seconds / enable 是语音和生图**共用**的键，不能覆盖，
-    # 语音的群聊冷却放在语音自己的配置里（cooldown_seconds=300）。
-    VOICE_TUNING_KEYS = ("group_enable", "auto_fallback", "daily_quota",
-                         "private_cooldown_seconds",
-                         "max_chars", "max_segments", "speak_threshold", "timeout", "speed")
-
-    def _speech_config(self):
-        """读语音插件自己的配置，再用面板（影音配置）里的调音键覆盖。
-
-        这样「面板改了就生效」，而 api_key / provider / model 这些仍然只从
-        config/DeepSeek_Harness_Amo_Speech_config.json 来。
-        """
-        names = ("DeepSeek_Harness_Amo_Speech", "Astrbot_Amo_Speechsound",
-                 "deepseek_harness_amo_speech", "deepseek_harness_amo_speechsound")
-        base = ""
-        try:
-            from astrbot.core.utils.astrbot_path import get_astrbot_data_path
-            base = os.path.join(str(get_astrbot_data_path()), "config")
-        except Exception:
-            base = ""
-        data = {}
-        if base:
-            for name in names:
-                try:
-                    with open(os.path.join(base, name + "_config.json"), "r", encoding="utf-8") as fh:
-                        loaded = json.load(fh)
-                except Exception:
-                    continue
-                if isinstance(loaded, dict) and loaded:
-                    data = dict(loaded)
-                    break
-        data["web_prefix"] = "/sp"
-        try:
-            panel = self.config if isinstance(self.config, dict) else {}
-            for key in self.VOICE_TUNING_KEYS:
-                if key in panel and panel[key] is not None:
-                    data[key] = panel[key]
-        except Exception as exc:
-            logger.debug("[amo_voice] 面板配置覆盖失败: %s" % exc)
-        return data
-
-    @filter.command("speak", alias={"语音"})
-    async def cmd_speak(self, event: AstrMessageEvent):
-        """/speak <文本>：手动合成一条语音，方便调试音色。"""
-        speech = self._speech()
-        if speech is None:
-            yield event.plain_result("语音没起来（影音插件的语音模块没加载）")
-            return
-        async for item in speech.cmd_speak(event):
-            yield item
-
-    @filter.on_llm_response()
-    async def on_media_llm_response(self, event: AstrMessageEvent, resp):
-        speech = self._speech()
-        if speech is None:
-            return
-        await speech.on_llm_response(event, resp)
-
-    @filter.on_decorating_result()
-    async def on_media_decorating_result(self, event: AstrMessageEvent):
-        speech = self._speech()
-        if speech is None:
-            return
-        await speech.on_decorating_result(event)
-
-    @filter.on_llm_request()
-    async def on_media_llm_request(self, event: AstrMessageEvent, req):
-        speech = self._speech()
-        if speech is None:
-            return
-        await speech.on_llm_request(event, req)
-
+    # 语音运行时与事件钩子已迁入 Terminal；本插件只保留社会关系数据与关系面板。
 
     def __init__(self, context: Context, config: dict = None):
         super().__init__(context)
@@ -3346,17 +3243,5 @@ class AmoRelationshipPlugin(Star):
         yield event.plain_result("用法：/amoimage status ｜ draw <提示词> ｜ outfit")
 
 
-# ── 语音（DeepSeek Harness Amo 口径）───────────────────────────
-import pathlib as _pl, sys as _sys
-_d = _pl.Path(__file__).parent / "sp"
-if _d.is_dir() and str(_d) not in _sys.path:
-    _sys.path.insert(0, str(_d))
-try:
-    from sp_main import SpeechSoundPlugin as SpeechSoundPlugin  # noqa: F401
-except Exception as _e:  # pragma: no cover
-    SpeechSoundPlugin = None  # type: ignore
-    print(f"[DeepSeek Amo] 语音合入失败：{_e}")
-
-
-# Backward-compatible import alias for deployments upgrading from the former Image plugin.
+# 旧插件类名兼容别名；不再在 Relationship 内加载媒体或语音引擎。
 AmoImagePlugin = AmoRelationshipPlugin
