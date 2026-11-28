@@ -3,7 +3,7 @@ display_name: DeepSeek Harness Amo Relationship
 plugin_order: 30
 desc: 我想永远陪着你-关系：人物身份、社会关系、信任熟悉度、互动历史与社会事件
 short_desc: 我想永远陪着你-关系
-version: 1.1.0
+version: 1.2.0
 author: 墨辞烟
 astrbot_version: ">=4.5.7"
 repo: https://github.com/GM888888456/DeepSeek_Harness_Amo_Relationship/
