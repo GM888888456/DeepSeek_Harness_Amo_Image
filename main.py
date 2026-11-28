@@ -19,7 +19,7 @@ except Exception:  # pragma: no cover
     from relationship_store import RelationshipStore  # type: ignore
 
 PLUGIN_NAME = "DeepSeek_Harness_Amo_Relationship"
-PLUGIN_VERSION = "1.2.0"
+PLUGIN_VERSION = "1.2.1"
 try:
     import yaml
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "metadata.yaml"),
