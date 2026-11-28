@@ -1,6 +1,6 @@
 # 链式排查手册（CHAIN）
 
-> 2026-11-15 ｜ 适用八仓库：终端 / 记忆 / 生图 / 语音 / 医疗 / 金融 / 市场 / 守护
+> 2026-11-28 ｜ 适用模块：终端（含影像 / 语音）/ 关系 / 记忆 / 医疗 / 金融 / 市场 / 守护
 
 八个插件是一个整体：Amo 是大脑，其余是挂载的执行器。每次业务动作都在插件**内部**
 按固定步骤走一遍，每一步写一行日志。出问题时不用猜，先看这条链断在哪一步。
@@ -32,8 +32,8 @@
 |---|---|---|
 | 终端 | `terminal.charge` | `propose` → `approve` → `charge` → `receipt` → `done`／`FAIL` |
 | 记忆 | `data.remember` ／ `data.recall` | `request` → `write`/`recall` → `done` |
-| 生图 | `image.draw` | `request` → `boundary` → `quota` → `prompt` → `generate` → `receipt` → `done` |
-| 语音 | `speech.speak` | `request` → `decide` → `split` → `synth` → `send` → `done` |
+| 终端影像 | `image.draw` | `request` → `boundary` → `quota` → `prompt` → `generate` → `receipt` → `done` |
+| 终端语音 | `speech.speak` | `request` → `decide` → `split` → `synth` → `send` → `done` |
 | 医疗 | `medical.treat` | `quote` → `approve` → `pay` → `execute` → `done` |
 | 金融 | `finance.charge` | `idempotent` → `apply` → `ledger` → `done` |
 | 市场 | `market.price` | `tick`（只在刷新失败时留痕，避免每分钟刷屏） |
