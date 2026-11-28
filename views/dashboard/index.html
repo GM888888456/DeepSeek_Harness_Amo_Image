@@ -17,7 +17,7 @@
 <body><div class="wrap">
 <header><div class="brand"><span class="dot"></span><span>关系网络</span></div><span class="clock" id="clock">Amo · Relationship</span><button class="icon-btn" id="theme" title="切换深浅色">◐</button></header>
 <nav class="tabs">
-<button class="tab on" data-tab="people">人物</button><button class="tab" data-tab="relations">关系</button><button class="tab" data-tab="history">互动</button>
+<button class="tab on" data-tab="people">人物</button><button class="tab" data-tab="relations">关系</button><button class="tab" data-tab="history">互动</button><button class="tab" data-tab="events">社会事件</button>
 </nav>
 <section class="pane" id="pane-people">
 <div class="card"><div class="card-title"><span>关系总览</span><span class="pill" id="connection">连接中</span></div>
@@ -41,6 +41,7 @@
 <div class="card"><div class="card-title"><span>关系网络</span><button class="link" id="refreshRelations">刷新</button></div><div id="relationList"><div class="empty">暂无关系</div></div></div>
 </section>
 <section class="pane" id="pane-history" hidden><div class="card"><div class="card-title"><span id="historyTitle">互动历史</span></div><div id="interactionList"><div class="empty">从人物列表选择一个人</div></div></div></section>
+<section class="pane" id="pane-events" hidden><div class="card"><div class="card-title"><span>社会事件</span><span class="hint">邀请、聚会、纪念日与共同活动</span></div><div class="relation-form"><label class="block wide">事件名称<input class="input" id="eventTitle" placeholder="例如：周末聚餐"></label><label class="block">开始时间<input class="input" id="eventStart" type="datetime-local"></label><label class="block">地点<input class="input" id="eventLocation" placeholder="地点"></label><label class="block wide">参与者<select class="input" id="eventParticipants" multiple size="4"></select></label><div class="wide"><button class="btn" id="saveEvent">保存事件</button></div></div></div><div class="card"><div class="card-title"><span>事件列表</span><button class="link" id="refreshEvents">刷新</button></div><div id="eventList"><div class="empty">暂无事件</div></div></div></section>
 <footer>Relationship 管理身份与社会关系；Terminal 负责事件、日程和行动协调。</footer>
 </div><script type="module" src="./app.js?v=1.0.0"></script>
 <script>(function(){const e=document.getElementById("clock");function t(){e.textContent=new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})}t();setInterval(t,20000)})();</script>
