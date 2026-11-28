@@ -2462,6 +2462,56 @@ class AmoRelationshipPlugin(Star):
             return {"code": 1, "msg": "缺少 person_id"}
         return {"code": 0, "data": {"items": store.list_interactions(pid, body.get("limit", 50))}}
 
+    async def api_relationship_interaction_record(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        body = await self._read_body()
+        try:
+            item = store.record_interaction(
+                body.get("person_id"), body.get("summary", ""),
+                channel=body.get("channel", ""), kind=body.get("kind", "conversation"),
+                occurred_at=body.get("occurred_at"), sentiment=body.get("sentiment"),
+                source_event_id=body.get("source_event_id"), metadata=body.get("metadata") or {},
+            )
+            return {"code": 0, "data": item}
+        except Exception as exc:
+            return {"code": 1, "msg": str(exc)}
+
+    async def api_relationship_events(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        return {"code": 0, "data": {"items": store.list_social_events(200)}}
+
+    async def api_relationship_event_save(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        body = await self._read_body()
+        try:
+            item = store.record_social_event(
+                body.get("title"), event_type=body.get("event_type", "social"),
+                starts_at=body.get("starts_at"), ends_at=body.get("ends_at"),
+                location=body.get("location", ""), participant_ids=body.get("participant_ids") or [],
+                status=body.get("status", "planned"), metadata=body.get("metadata") or {},
+                event_id=body.get("event_id") or None,
+            )
+            return {"code": 0, "data": item}
+        except Exception as exc:
+            return {"code": 1, "msg": str(exc)}
+
+    async def api_relationship_import_legacy(self):
+        store = getattr(self, "relationship_store", None)
+        if store is None:
+            return {"code": 1, "msg": "关系数据库不可用"}
+        body = await self._read_body()
+        try:
+            result = store.import_legacy(body.get("profiles"), body.get("relations"))
+            return {"code": 0, "data": result}
+        except Exception as exc:
+            return {"code": 1, "msg": str(exc)}
+
     # ---------- 面板 Web API ----------
 
     def _register_web_apis(self):
@@ -2490,6 +2540,10 @@ class AmoRelationshipPlugin(Star):
             ("/relationship/edges", self.api_relationship_edges, ["GET", "POST"]),
             ("/relationship/edge/save", self.api_relationship_edge_save, ["POST"]),
             ("/relationship/interactions", self.api_relationship_interactions, ["GET", "POST"]),
+            ("/relationship/interaction/record", self.api_relationship_interaction_record, ["POST"]),
+            ("/relationship/events", self.api_relationship_events, ["GET"]),
+            ("/relationship/event/save", self.api_relationship_event_save, ["POST"]),
+            ("/relationship/import-legacy", self.api_relationship_import_legacy, ["POST"]),
         ]
         for path, handler, methods in routes:
             try:
