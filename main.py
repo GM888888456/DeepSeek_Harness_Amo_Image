@@ -128,7 +128,7 @@ class EmptyBackendResponse(RuntimeError):
     """后端返回 200 但响应体为空 / 不是 JSON（网关限流、CDN 空包都长这样）。EmptyBackendResponse 的诊断 见 _json_or_empty。"""
 
 
-PLUGIN_NAME = "DeepSeek_Harness_Amo_Image"
+PLUGIN_NAME = "DeepSeek_Harness_Amo_Relationship"
 PLUGIN_VERSION = "1.0.0"
 try:  # 版本号以 metadata.yaml 为准，避免两处不一致
     import yaml as _amo_meta_yaml
@@ -487,7 +487,7 @@ def build_prompt(appearance: str, prompt: str, context_lines=None, look: str = "
     return "，".join(parts)
 
 
-class AmoImagePlugin(Star):
+class AmoRelationshipPlugin(Star):
     """生图插件：认人设、接上下文、只画图。"""
 
     # ------------------------------------------------------------------
@@ -868,7 +868,7 @@ class AmoImagePlugin(Star):
         for term in EXPLICIT_TERMS + MINOR_TERMS + INJECTION_TERMS:
             if self._normalize_text(term) in raw:
                 # 只记命中的词，不记整段提示词（里面有她的穿搭和聊天内容）
-                logger.warning("[amo_image] 内容边界拦下：命中「%s」" % term)
+                logger.warning("[relationship] 内容边界拦下：命中「%s」" % term)
                 return False
         if group and any(pattern.search(raw) for pattern in _GROUP_BLOCK_PATTERNS):
             return False
@@ -3302,3 +3302,7 @@ try:
 except Exception as _e:  # pragma: no cover
     SpeechSoundPlugin = None  # type: ignore
     print(f"[DeepSeek Amo] 语音合入失败：{_e}")
+
+
+# Backward-compatible import alias for deployments upgrading from the former Image plugin.
+AmoImagePlugin = AmoRelationshipPlugin
