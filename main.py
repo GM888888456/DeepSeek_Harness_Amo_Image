@@ -2687,11 +2687,6 @@ class AmoRelationshipPlugin(Star):
                 await self._sync_model_options()
             except Exception as exc:
                 logger.debug("[amo_image] 同步模型下拉失败: %s" % exc)
-            # 语音是影音的一部分：开机就把实例起起来，面板 /sp/* 才不会一直 404
-            try:
-                self._speech()
-            except Exception as exc:
-                logger.warning("[amo_image] 语音模块启动失败: %s" % exc)
 
     async def api_models(self):
         """拉当前后端的模型列表，面板里只让选、不让手填。"""
